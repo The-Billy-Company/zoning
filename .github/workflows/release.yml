@@ -3,7 +3,19 @@ name: release
 # One tag, both registries. crates.io and PyPI carry the same program built from
 # the same commit, so the only way they can disagree about what `zoning 0.2.0`
 # means is if this workflow half-fails - which is why the publish jobs run last
-# and only after every wheel in the matrix exists.
+# and only after every wheel in the matrix exists. They are siblings, not steps
+# in one job: the registries fail independently, and a wheel that already
+# uploaded must not be rolled back because a crate upload failed, nor the
+# reverse.
+#
+# ONE-TIME SETUP, both registries use Trusted Publishing so there is no API
+# token here to rotate or leak:
+#   - PyPI: add a trusted publisher for the `zoning` project pointing at this
+#     repository, workflow `release.yml`, environment `pypi`. Before the project
+#     exists this is a "pending publisher" under Your projects -> Publishing.
+#   - crates.io: add a trusted publisher to this crate pointing at this
+#     repository, workflow `release.yml`, environment `crates-io`. crates.io
+#     requires the crate to exist first, so 0.1.0 was published by hand.
 on:
   push:
     tags: ["v*"]
@@ -18,29 +30,32 @@ env:
 jobs:
   # The tag says a version; the manifest says a version. A release that ships
   # `0.1.0` under the tag `v0.2.0` is not recoverable on either registry - both
-  # refuse to reuse a version number - so this is the first gate, before anything
-  # is built.
+  # refuse to reuse a version number - so this is the first gate, before
+  # anything is built.
   tag:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: The tag and the manifest agree
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: The tag must name the version being published
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
-          manifest="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-          tagged="${GITHUB_REF_NAME#v}"
-          if [ "$manifest" != "$tagged" ]; then
-            echo "::error::tag $GITHUB_REF_NAME wants $tagged; Cargo.toml says $manifest"
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(python3 -c \
+            "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('Cargo.toml').read_text())['workspace']['package']['version'])")
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::tag v$tag would publish version $declared." \
+                 "Tag the version the manifest declares, or bump Cargo.toml." >&2
             exit 1
           fi
-          echo "releasing $manifest"
+          echo "releasing $declared"
 
   # A wheel per platform, plus one sdist. maturin cross-compiles the Linux
   # targets in a manylinux container, so the published wheels run on CI images
-  # older than this runner.
+  # older than this runner - which matters more than usual here, because the
+  # thing consuming these wheels IS someone else's CI.
   wheels:
     needs: tag
     name: ${{ matrix.target }}
@@ -55,61 +70,80 @@ jobs:
           - { os: macos-latest, target: aarch64-apple-darwin }
           - { os: windows-latest, target: x86_64-pc-windows-msvc }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: PyO3/maturin-action@v1
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           target: ${{ matrix.target }}
           args: --release --out dist
           manylinux: auto
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheel-${{ matrix.target }}
           path: dist/*
+          if-no-files-found: error
 
   sdist:
     needs: tag
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: PyO3/maturin-action@v1
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           command: sdist
           args: --out dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sdist
           path: dist/*
+          if-no-files-found: error
 
   pypi:
+    # Only a tag publishes. A manual run builds and verifies and stops there.
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [wheels, sdist]
     runs-on: ubuntu-latest
-    environment: release
-    # Trusted publishing: PyPI mints a short-lived token from this workflow's
-    # OIDC identity, so there is no API token in the repository to leak or
-    # rotate.
+    environment: pypi
     permissions:
+      # The OIDC token Trusted Publishing exchanges for an upload credential.
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
   crates:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [wheels, sdist]
     runs-on: ubuntu-latest
-    environment: release
+    environment: crates-io
+    permissions:
+      id-token: write # crates.io exchanges this OIDC token for a short-lived registry token.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo publish -p zoning --locked
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        id: auth
+      # Idempotent on purpose: a retry after a flake, or a dispatch on an
+      # existing tag, must not fail because the version is already on the index.
+      # A published version is immutable there, so "already present" is success.
+      - name: Publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if cargo publish -p zoning --locked; then
+            exit 0
+          fi
+          if cargo info "zoning@$version" >/dev/null 2>&1; then
+            echo "zoning $version is already on crates.io; nothing to do"
+            exit 0
+          fi
+          exit 1
