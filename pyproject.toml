@@ -21,7 +21,7 @@ license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Griffin Strier", email = "griffin@billylives.com" }]
 keywords = ["architecture", "lint", "imports", "dependencies", "zig"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Programming Language :: Rust",
