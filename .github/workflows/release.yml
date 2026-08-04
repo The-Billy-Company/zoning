@@ -8,6 +8,14 @@ name: release
 # uploaded must not be rolled back because a crate upload failed, nor the
 # reverse.
 #
+# `preflight` runs the shared org release contract before any of that: the
+# tag names the version Cargo.toml declares, changelog.d/ was folded with an
+# exact `## [X.Y.Z]` heading, `release-ready` was green on this exact commit,
+# and the commit is reachable from `main`. A maintainer prepares a release by
+# merging the release-please PR (release-please.yml), which already folded
+# the changelog and bumped the version, and cuts the GitHub Release itself the
+# moment that PR merges — this workflow only ever publishes the two registries.
+#
 # ONE-TIME SETUP, both registries use Trusted Publishing so there is no API
 # token here to rotate or leak:
 #   - PyPI: add a trusted publisher for the `zoning` project pointing at this
@@ -28,36 +36,50 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # The tag says a version; the manifest says a version. A release that ships
-  # `0.1.0` under the tag `v0.2.0` is not recoverable on either registry - both
-  # refuse to reuse a version number - so this is the first gate, before
-  # anything is built.
-  tag:
+  # The shared release contract (`release.toml` + the org's `package-release`
+  # action), run once before anything is built: is the tag the version
+  # `Cargo.toml` declares, is the changelog folded with the exact
+  # `## [X.Y.Z]` heading and no fragment left un-folded, did `release-ready`
+  # go green on this exact commit, and is this commit actually reachable from
+  # `main`? Every step below is conditioned on an actual tag, so a
+  # `workflow_dispatch` dry run (no tag) passes through as a no-op and
+  # `wheels`/`sdist` still run unpublished.
+  preflight:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: The tag must name the version being published
+      - id: version
         if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
-          declared=$(python3 -c \
-            "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('Cargo.toml').read_text())['workspace']['package']['version'])")
-          if [ "$tag" != "$declared" ]; then
-            echo "::error::tag v$tag would publish version $declared." \
-                 "Tag the version the manifest declares, or bump Cargo.toml." >&2
-            exit 1
-          fi
-          echo "releasing $declared"
+        uses: The-Billy-Company/.github/actions/package-release@deb135f046122a10cabc861e96eb9941c2d09ddc # main
+        with:
+          command: version
+          args: --root . --tag ${{ github.ref_name }}
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: The-Billy-Company/.github/actions/package-release@deb135f046122a10cabc861e96eb9941c2d09ddc # main
+        with:
+          command: changelog
+          args: >-
+            --root . --require-fragments-empty
+            --version ${{ fromJSON(steps.version.outputs.result).version }}
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: The-Billy-Company/.github/actions/package-release@deb135f046122a10cabc861e96eb9941c2d09ddc # main
+        with:
+          command: tag-ancestor
+          args: ${{ github.repository }} ${{ github.sha }} --branch main
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: The-Billy-Company/.github/actions/package-release@deb135f046122a10cabc861e96eb9941c2d09ddc # main
+        with:
+          command: ci-status
+          args: ${{ github.repository }} ${{ github.sha }}
 
   # A wheel per platform, plus one sdist. maturin cross-compiles the Linux
   # targets in a manylinux container, so the published wheels run on CI images
   # older than this runner - which matters more than usual here, because the
   # thing consuming these wheels IS someone else's CI.
   wheels:
-    needs: tag
+    needs: preflight
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -85,7 +107,7 @@ jobs:
           if-no-files-found: error
 
   sdist:
-    needs: tag
+    needs: preflight
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -104,7 +126,7 @@ jobs:
   pypi:
     # Only a tag publishes. A manual run builds and verifies and stops there.
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [wheels, sdist]
+    needs: [preflight, wheels, sdist]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -115,11 +137,34 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+      - id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      # Probed before the OIDC token is minted, the same idempotency the
+      # `crates` job proves below: a retry after a flake, or a dispatch on a
+      # tag that already shipped, must land on "already there" rather than
+      # spend a credential on an upload PyPI will reject anyway.
+      - id: probe
+        uses: The-Billy-Company/.github/actions/package-release@deb135f046122a10cabc861e96eb9941c2d09ddc # main
+        with:
+          command: registry-probe
+          args: pypi zoning ${{ steps.tag.outputs.version }}
+      - name: probe answered
+        env:
+          STATE: ${{ steps.probe.outputs.result }}
+        run: |
+          set -euo pipefail
+          if [ "$STATE" = error ]; then
+            echo "::error::PyPI did not answer for zoning ${{ steps.tag.outputs.version }} —" \
+                 "a network failure is never treated as \"absent\"." >&2
+            exit 1
+          fi
+          echo "zoning ${{ steps.tag.outputs.version }} on PyPI: $STATE"
+      - if: steps.probe.outputs.result == 'absent'
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
   crates:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [wheels, sdist]
+    needs: [preflight, wheels, sdist]
     runs-on: ubuntu-latest
     environment: crates-io
     permissions:
@@ -131,27 +176,32 @@ jobs:
       # Asked before a credential is minted, not after a failed upload. A retry
       # after a flake, or a dispatch on an existing tag, must not fail because
       # the version is already on the index - a published version is immutable
-      # there, so "already present" is success. Doing the check first also means
-      # re-tagging a hand-published version needs no trusted publisher at all.
-      - name: Is this version already on the index?
-        id: probe
+      # there, so "already present" is success. An "error" probe (registry
+      # unreachable) is a hard fail: it must never be read as "absent" and
+      # re-published blind.
+      - id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - id: probe
+        uses: The-Billy-Company/.github/actions/package-release@deb135f046122a10cabc861e96eb9941c2d09ddc # main
+        with:
+          command: registry-probe
+          args: crates zoning ${{ steps.tag.outputs.version }}
+      - name: probe answered
+        env:
+          STATE: ${{ steps.probe.outputs.result }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          code=$(curl -sS -o /dev/null -w '%{http_code}' \
-            -H 'User-Agent: zoning-release (github.com/The-Billy-Company/zoning)' \
-            "https://crates.io/api/v1/crates/zoning/$version")
-          if [ "$code" = "200" ]; then
-            echo "zoning $version is already on crates.io; nothing to publish"
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "needed=true" >> "$GITHUB_OUTPUT"
+          if [ "$STATE" = error ]; then
+            echo "::error::crates.io did not answer for zoning ${{ steps.tag.outputs.version }} —" \
+                 "a network failure is never treated as \"absent\"." >&2
+            exit 1
           fi
+          echo "zoning ${{ steps.tag.outputs.version }} on crates.io: $STATE"
       - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
         id: auth
-        if: steps.probe.outputs.needed == 'true'
+        if: steps.probe.outputs.result == 'absent'
       - name: Publish
-        if: steps.probe.outputs.needed == 'true'
+        if: steps.probe.outputs.result == 'absent'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish -p zoning --locked

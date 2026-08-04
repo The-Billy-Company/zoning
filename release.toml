@@ -1,0 +1,29 @@
+# Release contract for zoning, read by
+# The-Billy-Company/.github/actions/package-release. See that action's
+# README.md for the full schema; this file states only the facts specific to
+# this repository.
+#
+# pyproject.toml declares `dynamic = ["version"]` — maturin reads the version
+# straight from Cargo.toml at build time, so there is no second mirror to
+# check here.
+
+[package]
+name = "zoning"
+version_source = "Cargo.toml"
+version_kind = "cargo-workspace"
+
+[changelog]
+directory = "changelog.d"
+file = "CHANGELOG.md"
+ignore = [".gitkeep", "README.md"]
+types = ["added", "changed", "deprecated", "removed", "fixed", "security"]
+stem_pattern = '^\+[a-z0-9]+(-[a-z0-9]+)*$'
+min_body_chars = 40
+
+[ci]
+required_check = "release-ready"
+default_branch = "main"
+
+[registries]
+crates = "zoning"
+pypi = "zoning"
