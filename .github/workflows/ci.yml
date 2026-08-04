@@ -48,18 +48,23 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - run: cargo build --release
+      # `--root` rather than a `cd`: with no root given, zoning climbs to the
+      # enclosing git worktree, which for a fixture nested in this repo is this
+      # repo - so every box would report "no package declares a contract" and
+      # exit 0, and the whole loop would pass by finding nothing. Naming the
+      # root is what makes each box its own package.
       - name: fixtures pass, and their mutations fail
         run: |
           set -euo pipefail
           Z=target/release/zoning
           for box in tests/fixtures/pass/*/; do
             echo "::group::$box"
-            (cd "$box" && "$GITHUB_WORKSPACE/$Z" verify --untracked)
+            "$Z" verify --untracked --root "$box"
             echo "::endgroup::"
           done
           for box in tests/fixtures/fail/*/; do
             echo "::group::$box"
-            if (cd "$box" && "$GITHUB_WORKSPACE/$Z" verify --untracked); then
+            if "$Z" verify --untracked --root "$box"; then
               echo "::error::$box was expected to fail and did not"
               exit 1
             fi
@@ -141,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: ["1.85"] # keep in step with rust-version in Cargo.toml
+        rust: ["1.88"] # keep in step with rust-version in Cargo.toml
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

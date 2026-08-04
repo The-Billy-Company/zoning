@@ -5,7 +5,10 @@ members = ["crates/zoning"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+# 1.88 is where `let` chains stabilized. Three of them read better than the
+# nested `if`s they replace, and a floor a year old is not a barrier for a
+# tool most people will install as a prebuilt wheel rather than compile.
+rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/The-Billy-Company/zoning"
 homepage = "https://github.com/The-Billy-Company/zoning"
