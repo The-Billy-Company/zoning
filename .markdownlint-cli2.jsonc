@@ -1,0 +1,22 @@
+// Markdown discipline, read by `.githooks/pre-push` and by any editor with
+// markdownlint installed. The hook looks for this file by name in the commit it
+// is pushing, so the rules travel with the bytes they judge rather than living
+// in somebody's local settings.
+{
+  "config": {
+    // Prose wraps near 80 and the code in this repo is formatted to 100
+    // (`rustfmt.toml`), so 100 is the honest ceiling for a document that quotes
+    // it. Fences and tables are exempt because reflowing either one changes what
+    // it means: a wrapped `.zone` contract is not that contract, and a wrapped
+    // table row is not a row.
+    "MD013": {
+      "line_length": 100,
+      "code_blocks": false,
+      "tables": false
+    },
+    // Every unlabelled fence here holds either a `.zone` contract or terminal
+    // output. Neither has a highlighter, and `text` would assert only that no
+    // highlighter exists - which is what a bare fence already says.
+    "MD040": false
+  }
+}
