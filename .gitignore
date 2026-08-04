@@ -2,7 +2,7 @@
 target/
 **/*.rs.bk
 
-# Python (bindings/python — the PyPI half)
+# The PyPI half: maturin builds the same binary into a wheel from `pyproject.toml`.
 __pycache__/
 *.py[cod]
 *.egg-info/

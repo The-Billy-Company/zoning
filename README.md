@@ -255,19 +255,18 @@ or the invocation is malformed.
 
 ```yaml
 - name: Import topology
-  run: |
-    cargo install zoning --locked
-    zoning verify
+  run: uv run --no-project --with zoning==0.1.0 zoning verify
 ```
 
-Or, without a Rust toolchain in the job:
+That is the whole integration - no Rust toolchain in the job, no build, no
+compile database, and no network beyond fetching itself. Pin the version: a gate
+whose verdict can change without a commit is not a gate.
+
+With a toolchain already in the job, the same binary comes from crates.io:
 
 ```yaml
-- run: uvx zoning verify
+- run: cargo install zoning --locked && zoning verify
 ```
-
-That is the whole integration. It needs no build, no compile database, and no
-network beyond fetching itself.
 
 ## Languages
 

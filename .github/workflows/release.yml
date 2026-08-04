@@ -1,0 +1,115 @@
+name: release
+
+# One tag, both registries. crates.io and PyPI carry the same program built from
+# the same commit, so the only way they can disagree about what `zoning 0.2.0`
+# means is if this workflow half-fails - which is why the publish jobs run last
+# and only after every wheel in the matrix exists.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The tag says a version; the manifest says a version. A release that ships
+  # `0.1.0` under the tag `v0.2.0` is not recoverable on either registry - both
+  # refuse to reuse a version number - so this is the first gate, before anything
+  # is built.
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: The tag and the manifest agree
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          manifest="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
+          tagged="${GITHUB_REF_NAME#v}"
+          if [ "$manifest" != "$tagged" ]; then
+            echo "::error::tag $GITHUB_REF_NAME wants $tagged; Cargo.toml says $manifest"
+            exit 1
+          fi
+          echo "releasing $manifest"
+
+  # A wheel per platform, plus one sdist. maturin cross-compiles the Linux
+  # targets in a manylinux container, so the published wheels run on CI images
+  # older than this runner.
+  wheels:
+    needs: tag
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: auto
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: dist/*
+
+  sdist:
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*
+
+  pypi:
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: release
+    # Trusted publishing: PyPI mints a short-lived token from this workflow's
+    # OIDC identity, so there is no API token in the repository to leak or
+    # rotate.
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  crates:
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish -p zoning --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

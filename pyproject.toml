@@ -1,0 +1,44 @@
+# The PyPI half of the same binary.
+#
+# zoning is a Rust program with no Python in it. This file exists because the
+# tool's job is to run in other people's CI, and the cheapest thing to ask a CI
+# runner for is `uvx zoning verify` - no Rust toolchain, no compile step, no
+# `cargo install` cache to warm. maturin's `bindings = "bin"` packages the
+# release binary as a wheel's console script, so the PyPI artifact and the
+# crates.io artifact are the same program built from the same source, and
+# neither is a reimplementation that can drift from the other.
+
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "zoning"
+description = "An import-topology gate: declare the zones a package's imports may cross, and judge the real import graph against them."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Griffin Strier", email = "griffin@billylives.com" }]
+keywords = ["architecture", "lint", "imports", "dependencies", "zig"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Rust",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
+# The wheel ships a compiled binary and imports nothing, so it needs no runtime
+# Python beyond an interpreter new enough for `uvx` to resolve the wheel tag.
+requires-python = ">=3.9"
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/The-Billy-Company/zoning"
+Repository = "https://github.com/The-Billy-Company/zoning"
+Changelog = "https://github.com/The-Billy-Company/zoning/releases"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "crates/zoning/Cargo.toml"
+strip = true
