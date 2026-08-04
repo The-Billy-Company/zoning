@@ -6,7 +6,12 @@
 
 use std::fmt;
 
-/// One of the six things a contract can be violated on.
+/// One of the seven things a contract can be violated on.
+///
+/// Five are about the inside of a package — where a file sits and who may reach it.
+/// Two are about the outside: [`Law::Use`] when an import names a module the zone was
+/// never granted, [`Law::Escape`] when a path climbs out of the module root. A
+/// dependency leaves a package by exactly those two routes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Law {
     /// An import pointed up the stack.
@@ -19,17 +24,20 @@ pub enum Law {
     Cycle,
     /// An import climbed more directories than the ceiling allows.
     Reach,
+    /// An import named an outside module this zone was not granted.
+    Use,
     /// An import climbed out of the module root entirely.
     Escape,
 }
 
 impl Law {
     /// Every law, in reporting order.
-    pub const ALL: [Self; 6] =
-        [Self::Zone, Self::Seal, Self::Keep, Self::Cycle, Self::Reach, Self::Escape];
+    pub const ALL: [Self; 7] =
+        [Self::Zone, Self::Seal, Self::Keep, Self::Cycle, Self::Reach, Self::Use, Self::Escape];
 
     /// The spellings a `variance` may name, in the same order as [`Law::ALL`].
-    pub const NAMES: [&'static str; 6] = ["zone", "seal", "keep", "cycle", "reach", "escape"];
+    pub const NAMES: [&'static str; 7] =
+        ["zone", "seal", "keep", "cycle", "reach", "use", "escape"];
 
     /// How this law is spelled in a contract.
     #[must_use]
@@ -37,7 +45,7 @@ impl Law {
         Self::NAMES[self as usize]
     }
 
-    /// Parse a law name, or `None` if it is not one of the six.
+    /// Parse a law name, or `None` if it is not one of the seven.
     #[must_use]
     pub fn parse(name: &str) -> Option<Self> {
         Self::NAMES.iter().position(|n| *n == name).map(|i| Self::ALL[i])
@@ -67,6 +75,12 @@ impl Law {
             Self::Reach => {
                 "Move the file nearer what it depends on, or lower `limit reach` \
                  deliberately (it is a ceiling you lower, never raise to go green)."
+            }
+            Self::Use => {
+                "Grant it with `use <module> by <zone>`, or take the dependency in a \
+                 zone that already carries it — the point of the grant is that a new \
+                 outside dependency is a decision somebody makes, not one an import \
+                 makes quietly."
             }
             Self::Escape => "Declare the cross-module dependency as a named module in the build.",
         }

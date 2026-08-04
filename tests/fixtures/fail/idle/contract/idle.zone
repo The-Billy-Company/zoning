@@ -1,0 +1,13 @@
+// A grant for a module nothing imports. Reach that was declared and never
+// taken is exactly as misleading as a variance for a debt already paid, so it
+// is reported the same way: stale, delete the line.
+package idle {
+    root   src
+    facade root.zig
+}
+
+zones {
+    lib  lib.zig
+}
+
+use ledger

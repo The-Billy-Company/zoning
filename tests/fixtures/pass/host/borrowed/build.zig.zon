@@ -1,0 +1,5 @@
+.{
+    .name = .borrowed,
+    .version = "0.0.0",
+    .paths = .{ "build.zig.zon", "lend.zig" },
+}

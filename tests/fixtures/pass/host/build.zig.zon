@@ -1,0 +1,9 @@
+.{
+    .name = .host,
+    .version = "0.0.0",
+    .dependencies = .{
+        // Vendored rather than fetched, and therefore governed where it came from.
+        .borrowed = .{ .path = "borrowed" },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "borrowed", "core", "gate.zig" },
+}

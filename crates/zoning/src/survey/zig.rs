@@ -33,6 +33,79 @@ impl Dialect for Zig {
         &["zig"]
     }
 
+    fn manifests(&self) -> &'static [&'static str] {
+        &["build.zig", "build.zig.zon"]
+    }
+
+    // `build.zig.zon` spells a vendored dependency `.name = .{ .path = "dir" }`, and
+    // `.path` appears nowhere else in the grammar — `.paths` is the publish manifest and
+    // is plural. So the keys alone recover every in-tree dependency without a ZON
+    // parser, and a stray match would only ever excuse a directory the manifest already
+    // pointed at.
+    fn vendored(&self, manifest: &str) -> Vec<String> {
+        let code = PROSE.code_only(manifest);
+        let mut out = Vec::new();
+        let mut i = 0;
+        while let Some(k) = find(&code[i..], b".path") {
+            let head = i + k;
+            i = head + b".path".len();
+            let mut j = i;
+            while matches!(code.get(j), Some(b' ' | b'\t')) {
+                j += 1;
+            }
+            if code.get(j) != Some(&b'=') {
+                continue;
+            }
+            if let Some(dir) = literal(manifest.as_bytes(), j + 1) {
+                out.push(dir.trim_end_matches('/').to_owned());
+            }
+        }
+        out
+    }
+
+    // `.name = .irregex` since Zig 0.14 made it an enum literal; older manifests spell
+    // it `.name = "irregex"`. Both are read, because a tree does not upgrade its
+    // manifests the day the compiler changes and a contract named after the wrong thing
+    // is worse than one named after the directory.
+    fn declared(&self, manifest: &str) -> Option<String> {
+        let code = PROSE.code_only(manifest);
+        let head = find(&code, b".name")?;
+        let mut j = head + b".name".len();
+        while matches!(code.get(j), Some(b' ' | b'\t')) {
+            j += 1;
+        }
+        if code.get(j) != Some(&b'=') {
+            return None;
+        }
+        j += 1;
+        // The value is read from the original bytes, because `code_only` blanks a literal
+        // *to whitespace* — skipping whitespace in the blanked copy would step over the
+        // quoted form's entire value and land on the next token. The key was located in
+        // the blanked copy so a commented-out `.name` cannot win; the value is read where
+        // it is actually written. Same division of labour as the import lexer.
+        if let Some(quoted) = literal(manifest.as_bytes(), j) {
+            return Some(quoted);
+        }
+        let raw = manifest.as_bytes();
+        while raw.get(j).is_some_and(u8::is_ascii_whitespace) {
+            j += 1;
+        }
+        if raw.get(j) != Some(&b'.') {
+            return None;
+        }
+        let word = &manifest[j + 1..];
+        let end = word.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(word.len());
+        (end > 0).then(|| word[..end].to_owned())
+    }
+
+    // `std` is the standard library; `builtin` is the compiler's own view of the
+    // build; `root` is whatever file the compilation began at. All three are
+    // available to every file of every Zig package by construction, so none of them
+    // is a dependency a contract could meaningfully refuse.
+    fn ambient(&self) -> &'static [&'static str] {
+        &["std", "builtin", "root"]
+    }
+
     fn prose(&self) -> &Prose {
         &PROSE
     }
@@ -132,6 +205,45 @@ const d = @import( \"spaced.zig\" );
 const e = @import(comptime_value);
 ";
         assert_eq!(specs(src), ["std", "../a/b.zig", "spaced.zig"]);
+    }
+
+    #[test]
+    fn reads_in_tree_dependencies_and_not_the_publish_paths() {
+        let zon = "\
+.{
+    .name = .chassis,
+    .dependencies = .{
+        // .brigade = .{ .path = \"commented\" },
+        .brigade = .{ .path = \"brigade\" },
+        .fetched = .{ .url = \"https://example/x.tar.gz\", .hash = \"…\" },
+    },
+    .paths = .{ \"build.zig\", \"brigade\", \"README.md\" },
+}
+";
+        assert_eq!(Zig.vendored(zon), ["brigade"]);
+    }
+
+    #[test]
+    fn reads_the_declared_name_in_either_spelling() {
+        // Zig 0.14 onward, and what every current manifest here spells.
+        assert_eq!(
+            Zig.declared(".{ .name = .irregex, .version = \"0.1.0\" }").as_deref(),
+            Some("irregex")
+        );
+        // Before it, and still on disk in trees that have not moved.
+        assert_eq!(Zig.declared(".{ .name = \"irregex\" }").as_deref(), Some("irregex"));
+        // `.name` is the first key by convention but not by rule, and a commented-out one
+        // must not win — the same prose discipline the import lexer uses.
+        let zon = "\
+.{
+    // .name = .wrong,
+    .version = \"0.1.0\",
+    .name = .right,
+}
+";
+        assert_eq!(Zig.declared(zon).as_deref(), Some("right"));
+        // A manifest that names nothing leaves the directory to say it.
+        assert_eq!(Zig.declared(".{ .version = \"0.1.0\" }"), None);
     }
 
     #[test]

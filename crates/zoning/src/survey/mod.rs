@@ -22,11 +22,12 @@ use std::path::{Path, PathBuf};
 
 pub use dialect::{Dialect, Import, all as dialects, by_name as dialect};
 pub use prose::Prose;
-pub use walk::tracked;
+pub use walk::{SKIP, tracked};
 
 use crate::pattern::Pattern;
 
 /// One resolved intra-module import.
+#[derive(Clone)]
 pub struct Edge {
     /// Module-relative path of the importing file.
     pub src: String,
@@ -48,22 +49,24 @@ impl Edge {
     }
 }
 
-/// An import whose path climbs out of the module root.
+/// An import that leaves the package: by name, or by climbing out of the root.
 ///
-/// The build cannot follow it — a dependency that leaves the module has to be a
-/// named module — so this is an architectural statement, not a typo, and it is the
-/// one resolution failure worth a law.
-pub struct Escape {
+/// The two are the same event with different spellings. A named module is a
+/// dependency the build system resolves, which the `use` law governs; a path that
+/// climbs past the root is a dependency the build system *cannot* resolve, which the
+/// `escape` law governs. Both need the importing file, the literal, and the line, so
+/// both are this.
+pub struct Departure {
     /// Module-relative path of the importing file.
     pub src: String,
-    /// The literal as written.
+    /// The module name, or the literal path that climbed out.
     pub spec: String,
     /// 1-based line of the import statement.
     pub line: usize,
 }
 
-impl Escape {
-    /// The stable name a `variance` uses to ratify this escape.
+impl Departure {
+    /// The stable name a `variance` uses to ratify this dependency.
     #[must_use]
     pub fn key(&self) -> String {
         format!("{} -> {}", self.src, self.spec)
@@ -95,9 +98,9 @@ pub struct Survey {
     /// Every edge with both endpoints in `files`.
     pub edges: Vec<Edge>,
     /// Every import that climbed out of the module.
-    pub escapes: Vec<Escape>,
-    /// External module names imported by name rather than by path.
-    pub named: Vec<String>,
+    pub escapes: Vec<Departure>,
+    /// Every import naming a module outside the package, located.
+    pub outside: Vec<Departure>,
     /// Imports whose target is outside the judged set.
     pub skipped: usize,
     /// Exclude globs that actually held a file back.
@@ -114,6 +117,12 @@ impl Survey {
         let admitted: Vec<(PathBuf, String)> =
             walk::source_files(ask.module_root, ask.dialect.extensions())
                 .into_iter()
+                // The file that declares a package is not part of the module it declares.
+                // It only ever collides with the judged set when the module root *is* the
+                // package root, and a build script's imports are the build graph's, not
+                // this module's — governing them would put the build's own dependencies
+                // in the stack it is describing.
+                .filter(|(_, rel)| !ask.dialect.manifests().contains(&rel.as_str()))
                 .filter(|(abs, rel)| {
                     let held: Vec<&str> = ask
                         .exclude
@@ -132,7 +141,7 @@ impl Survey {
         let judged: HashSet<&str> = admitted.iter().map(|(_, rel)| rel.as_str()).collect();
 
         let (mut edges, mut escapes, mut skipped) = (Vec::new(), Vec::new(), 0);
-        let mut named: HashSet<String> = HashSet::new();
+        let mut outside = Vec::new();
         for (abs, src) in &admitted {
             let Ok(raw) = fs::read_to_string(abs) else { continue };
             let code = ask.dialect.prose().code_only(&raw);
@@ -140,11 +149,11 @@ impl Survey {
             for import in ask.dialect.imports(&raw, &code) {
                 let line = lines.at(import.offset);
                 if !ask.dialect.is_local(&import.spec) {
-                    named.insert(import.spec);
+                    outside.push(Departure { src: src.clone(), spec: import.spec, line });
                     continue;
                 }
                 let Some(dst) = resolve(src, &import.spec) else {
-                    escapes.push(Escape { src: src.clone(), spec: import.spec, line });
+                    escapes.push(Departure { src: src.clone(), spec: import.spec, line });
                     continue;
                 };
                 if !judged.contains(dst.as_str()) {
@@ -161,19 +170,47 @@ impl Survey {
             }
         }
 
-        let mut named: Vec<String> = named.into_iter().collect();
-        named.sort();
         Self {
             repo_root: ask.repo_root.to_path_buf(),
             module_root: ask.module_root.to_path_buf(),
             files: admitted.into_iter().map(|(_, rel)| rel).collect(),
             edges,
             escapes,
-            named,
+            outside,
             skipped,
             spent,
             dialect: ask.dialect,
         }
+    }
+
+    /// This module's real file set, with one hypothetical import in place of its graph.
+    ///
+    /// For asking a law about an edge that does not exist yet. The file set stays real
+    /// so zone membership, seals, and keeps all resolve exactly as they would after the
+    /// edit; only the graph is replaced, which is why the answer comes from the laws
+    /// themselves instead of from a second, drifting copy of them.
+    #[must_use]
+    pub fn hypothetically(&self, edge: Edge) -> Self {
+        Self {
+            repo_root: self.repo_root.clone(),
+            module_root: self.module_root.clone(),
+            files: self.files.clone(),
+            edges: vec![edge],
+            escapes: Vec::new(),
+            outside: Vec::new(),
+            skipped: 0,
+            spent: self.spent.clone(),
+            dialect: self.dialect,
+        }
+    }
+
+    /// Every outside module this package imports, once each, sorted.
+    #[must_use]
+    pub fn modules(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.outside.iter().map(|o| o.spec.as_str()).collect();
+        names.sort_unstable();
+        names.dedup();
+        names
     }
 
     /// Module-relative path → repo-relative, for a report line an editor can open.

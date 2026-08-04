@@ -1,4 +1,4 @@
-//! The six checks themselves.
+//! The seven checks themselves.
 //!
 //! Each reads the survey and writes findings onto the bench. They are separate
 //! passes rather than one fused walk because they answer different questions about
@@ -54,15 +54,7 @@ impl Bench<'_> {
             }
         }
 
-        // A zone that claims nothing is permission outliving the code it was for.
-        let file = contract_name(self);
-        let idle: Vec<String> = ordinance
-            .zones
-            .iter()
-            .filter(|z| !claimed.contains_key(z.name.as_str()))
-            .map(|z| format!("zone {}  ({file}: matches no file under {})", z.name, z.paths))
-            .collect();
-        self.stale.extend(idle);
+        self.idle_zones(&claimed);
 
         let names: HashMap<usize, &str> =
             ordinance.zones.iter().map(|z| (z.rank, z.name.as_str())).collect();
@@ -105,6 +97,42 @@ impl Bench<'_> {
                 edge.key(),
             );
         }
+    }
+
+    /// A zone that claims nothing is permission outliving the code it was written for.
+    ///
+    /// Unless what it reached for was the facade, which stands above every zone. Naming
+    /// the facade in the stack is the first thing everybody tries, so it is worth saying
+    /// why the line did nothing instead of reporting an empty glob and letting the reader
+    /// go looking for a file that is right there.
+    fn idle_zones(&mut self, claimed: &HashMap<&str, usize>) {
+        let (survey, ordinance) = (self.survey, self.ordinance);
+        let file = contract_name(self);
+        let idle: Vec<String> = ordinance
+            .zones
+            .iter()
+            .filter(|zone| !claimed.contains_key(zone.name.as_str()))
+            .map(|zone| {
+                let facade = survey
+                    .files
+                    .iter()
+                    .find(|rel| ordinance.is_facade(rel) && zone.paths.matches(rel));
+                match facade {
+                    Some(rel) => format!(
+                        "zone {}  ({file}: matches only the facade `{rel}`, which stands above \
+                         every zone — delete the line)",
+                        zone.name
+                    ),
+                    None => {
+                        format!(
+                            "zone {}  ({file}: matches no file under {})",
+                            zone.name, zone.paths
+                        )
+                    }
+                }
+            })
+            .collect();
+        self.stale.extend(idle);
     }
 
     /// **seal** — a sealed directory is entered through its entry file, or not at all.
@@ -151,7 +179,11 @@ impl Bench<'_> {
                 self.stale.push(format!("keep {}  ({file}: matches no file)", keep.subject));
                 continue;
             }
-            let guests: Vec<String> = keep.importers.raw().map(|i| format!("`{i}`")).collect();
+            let guests = if keep.importers.is_empty() {
+                "nobody".to_owned()
+            } else {
+                keep.importers.raw().map(|i| format!("`{i}`")).collect::<Vec<_>>().join(", ")
+            };
             for edge in &survey.edges {
                 if !held.contains(edge.dst.as_str()) || held.contains(edge.src.as_str()) {
                     continue;
@@ -167,11 +199,9 @@ impl Bench<'_> {
                     &edge.src,
                     edge.line,
                     format!(
-                        "reaches into `{}` (`{}`), which is kept to {} — this caller is not \
-                         on the guest list; go through a module both sides already stand on",
-                        keep.subject,
-                        edge.dst,
-                        guests.join(", ")
+                        "reaches into `{}` (`{}`), which is kept to {guests} — this caller is \
+                         not on the guest list; go through a module both sides already stand on",
+                        keep.subject, edge.dst
                     ),
                     edge.key(),
                 );
@@ -181,17 +211,7 @@ impl Bench<'_> {
 
     /// **cycle** — no import cycle may cross a directory boundary.
     pub(super) fn cycles(&mut self) {
-        let (survey, ordinance) = (self.survey, self.ordinance);
-        let mut adjacency: HashMap<&str, Vec<&str>> =
-            survey.files.iter().map(|f| (f.as_str(), Vec::new())).collect();
-        for edge in &survey.edges {
-            if ordinance.is_facade(&edge.src) || one_module(&edge.src, &edge.dst) {
-                continue;
-            }
-            adjacency.entry(&edge.src).or_default().push(&edge.dst);
-        }
-
-        for component in cycle::components(&adjacency) {
+        for component in cycle::tangles(self.survey, &self.ordinance.facade) {
             let mut dirs: Vec<&str> = component.iter().map(|m| dir_of(m)).collect();
             dirs.sort_unstable();
             dirs.dedup();
@@ -236,6 +256,72 @@ impl Bench<'_> {
         }
     }
 
+    /// **use** — an outside module is imported only where it was granted.
+    ///
+    /// The other six laws partition what this package owns; this one is the only
+    /// statement it makes about what it does not. A file naming a module nobody
+    /// granted its zone has added a dependency to the package by writing one line,
+    /// which is exactly the decision a contract exists to make visible.
+    ///
+    /// One refusal per **scope and module**, not per import site. An ungranted module is
+    /// a single missing decision however many files took it — sixty identical lines
+    /// saying so would be a report nobody reads, and would price one omission as sixty
+    /// violations in the burndown. The count rides along, and the first site is the
+    /// location, so an editor still lands somewhere real.
+    pub(super) fn uses(&mut self) {
+        let (survey, ordinance) = (self.survey, self.ordinance);
+        let mut spent: HashSet<usize> = HashSet::new();
+        let mut refusals: Vec<Refusal<'_>> = Vec::new();
+        let mut seen: HashMap<(&str, &str), usize> = HashMap::new();
+
+        for outside in &survey.outside {
+            if ordinance.dialect.ambient().contains(&outside.spec.as_str()) {
+                continue;
+            }
+            let granted = ordinance
+                .uses
+                .iter()
+                .position(|u| u.module == outside.spec && u.covers(&outside.src));
+            if let Some(at) = granted {
+                spent.insert(at);
+                continue;
+            }
+            let zone = ordinance.zone_of(&outside.src).map(|z| z.name.as_str());
+            let key = (outside.spec.as_str(), zone.unwrap_or_default());
+            if let Some(&at) = seen.get(&key) {
+                refusals[at].count += 1;
+            } else {
+                seen.insert(key, refusals.len());
+                refusals.push(Refusal {
+                    module: &outside.spec,
+                    zone,
+                    file: &outside.src,
+                    line: outside.line,
+                    count: 1,
+                });
+            }
+        }
+
+        for refusal in refusals {
+            let (message, subject) = refusal.told(ordinance);
+            self.record(Law::Use, refusal.file, refusal.line, message, subject);
+        }
+
+        // A grant nobody exercised is permission outliving the dependency it was
+        // written for — the same debt a spent-out variance is, and deleted the same way.
+        // Counted per line, not per module: two scoped grants for one module are two
+        // separate claims, and one of them going quiet is exactly what should surface.
+        let file = contract_name(self);
+        let idle: Vec<String> = ordinance
+            .uses
+            .iter()
+            .enumerate()
+            .filter(|(at, _)| !spent.contains(at))
+            .map(|(_, u)| format!("use {}  ({file}: nothing imports it)", written(u)))
+            .collect();
+        self.stale.extend(idle);
+    }
+
     /// **escape** — an import may not climb out of the module root.
     pub(super) fn escapes(&mut self) {
         let survey = self.survey;
@@ -249,6 +335,62 @@ impl Bench<'_> {
                 escape.key(),
             );
         }
+    }
+}
+
+/// One scope reaching for one module it was not granted, however many files did it.
+struct Refusal<'a> {
+    module: &'a str,
+    /// The zone doing the reaching, or `None` for the facade, which has no zone.
+    zone: Option<&'a str>,
+    /// The first site, so the finding still points at code.
+    file: &'a str,
+    line: usize,
+    count: usize,
+}
+
+impl Refusal<'_> {
+    /// The finding's message, and the subject a variance would have to name.
+    ///
+    /// The subject reads as an edge from a scope to a module (`exec -> pcre2`) because
+    /// that is what a `variance use` ratifies: a dependency somebody means to retire,
+    /// as against a `use` grant, which is one they mean to keep. Two spellings, and the
+    /// difference between them is whether the line carries a reason.
+    fn told(&self, ordinance: &crate::ordinance::Ordinance) -> (String, String) {
+        let here = self.zone.map_or_else(|| "the facade".to_owned(), |z| format!("zone `{z}`"));
+        let spread = match self.count {
+            1 => String::new(),
+            n => format!(" from {n} files"),
+        };
+        let elsewhere: Vec<String> = ordinance
+            .grants_of(self.module)
+            .flat_map(|u| u.written.iter().map(|scope| format!("`{scope}`")))
+            .collect();
+        let message = if elsewhere.is_empty() {
+            format!(
+                "{here} imports the outside module `{}`{spread}, and nothing in this package is \
+                 granted it — a dependency leaving the package is a decision, so it is written \
+                 down or it does not happen",
+                self.module
+            )
+        } else {
+            format!(
+                "{here} imports the outside module `{}`{spread}, granted to {} but not here — \
+                 the grant is the list of who carries this dependency, and this scope is not on it",
+                self.module,
+                elsewhere.join(", ")
+            )
+        };
+        (message, format!("{} -> {}", self.zone.unwrap_or("facade"), self.module))
+    }
+}
+
+/// A grant spelled the way its author wrote it, so a stale line can be found by eye.
+fn written(grant: &crate::ordinance::Use) -> String {
+    if grant.written.is_empty() {
+        grant.module.clone()
+    } else {
+        format!("{} by {}", grant.module, grant.written.join(" "))
     }
 }
 
@@ -270,7 +412,8 @@ fn innermost<'a>(seals: &'a [Seal], dst: &str) -> Option<&'a Seal> {
 }
 
 /// The directory holding `path`, or `.` for a file at the module root.
-pub(crate) fn dir_of(path: &str) -> &str {
+#[must_use]
+pub fn dir_of(path: &str) -> &str {
     path.rsplit_once('/').map_or(".", |(dir, _)| dir)
 }
 

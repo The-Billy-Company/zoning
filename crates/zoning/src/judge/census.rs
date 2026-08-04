@@ -12,6 +12,33 @@ use super::law::{dir_of, inside};
 use crate::ordinance::Ordinance;
 use crate::survey::Survey;
 
+/// Where an outside module stands with the contract.
+///
+/// Reported rather than merely counted because the three are read differently: an
+/// ambient module is noise, a granted one is the architecture, and an ungranted one
+/// is a finding you are about to see spelled out below.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Standing {
+    /// The language always provides it; no grant applies.
+    Ambient,
+    /// A `use` line grants it.
+    Granted,
+    /// Nothing grants it, everywhere it is imported.
+    Ungranted,
+}
+
+impl Standing {
+    /// The one word a census line carries.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ambient => "ambient",
+            Self::Granted => "granted",
+            Self::Ungranted => "ungranted",
+        }
+    }
+}
+
 /// The shape of a module, measured.
 pub struct Census {
     /// Files in the judged set.
@@ -20,8 +47,8 @@ pub struct Census {
     pub edges: usize,
     /// Imports pointing outside the judged set — usually a coworker's new file.
     pub unjudged_imports: usize,
-    /// External modules imported by name.
-    pub named_modules: Vec<String>,
+    /// Outside modules imported by name, and whether the contract granted each.
+    pub modules: Vec<(String, Standing)>,
     /// How many imports climb how many directories, ascending.
     pub hops: Vec<(u32, usize)>,
     /// Files per zone, low to high.
@@ -77,7 +104,7 @@ pub(super) fn take(survey: &Survey, ordinance: &Ordinance) -> Census {
         files: survey.files.len(),
         edges: survey.edges.len(),
         unjudged_imports: survey.skipped,
-        named_modules: survey.named.clone(),
+        modules: standing(survey, ordinance),
         hops,
         zones: ordinance
             .zones
@@ -94,6 +121,35 @@ pub(super) fn take(survey: &Survey, ordinance: &Ordinance) -> Census {
         sealable,
         seal_debt,
     }
+}
+
+/// Every outside module the package imports, with where it stands.
+///
+/// A module granted somewhere and imported somewhere else reads as `ungranted`,
+/// because that is the interesting half: the grant already exists, so the finding is
+/// about the caller, and a census claiming the module is fine would send a reader to
+/// the wrong place.
+fn standing(survey: &Survey, ordinance: &Ordinance) -> Vec<(String, Standing)> {
+    let ambient = survey.dialect.ambient();
+    survey
+        .modules()
+        .into_iter()
+        .map(|name| {
+            let standing = if ambient.contains(&name) {
+                Standing::Ambient
+            } else if survey
+                .outside
+                .iter()
+                .filter(|o| o.spec == name)
+                .all(|o| ordinance.may_use(&o.src, name))
+            {
+                Standing::Granted
+            } else {
+                Standing::Ungranted
+            };
+            (name.to_owned(), standing)
+        })
+        .collect()
 }
 
 /// Directory → the file that already fronts it, in either spelling.

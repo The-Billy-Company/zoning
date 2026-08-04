@@ -1,0 +1,18 @@
+// A package whose root IS the package root, so the manifests sit beside its code —
+// and one that vendors a dependency in-tree. Passing proves two things a contract
+// cannot say for itself: the file declaring a package is not judged as part of it,
+// and the vendored package is not this one's code.
+
+package host {
+    root     .
+    language zig
+    facade   gate.zig
+    exclude  borrowed/**
+}
+
+zones {
+    core  core/**
+}
+
+limit  reach to 0 hops
+forbid cycles across directories

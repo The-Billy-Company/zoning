@@ -13,6 +13,9 @@
 //!   notice until the module is unsplittable.
 //! * **reach** — a five-hop `../../../../../` resolves fine and says, quietly, that
 //!   the file's physical home disagrees with its logical one.
+//! * **use** — a dependency on another package arrives as one import of a name the
+//!   build system happens to resolve, with nothing recording that the package now
+//!   carries it.
 //! * **escape** — a path climbing out of the module root is a dependency the build
 //!   cannot follow.
 //!
@@ -27,7 +30,9 @@ mod law;
 
 use std::collections::HashSet;
 
-pub use census::Census;
+pub use census::{Census, Standing};
+pub use cycle::{condensation, tangles};
+pub use law::dir_of;
 // Path predicates the laws reason with. The map draws the same distinctions, and
 // two answers to "is this file inside that directory" is one answer too many.
 pub(crate) use law::inside;
@@ -89,6 +94,7 @@ pub fn judge(survey: &Survey, ordinance: &Ordinance) -> Verdict {
     bench.keeps();
     bench.cycles();
     bench.reach();
+    bench.uses();
     bench.escapes();
 
     // A variance nobody needed is permission outliving the code it was written for.

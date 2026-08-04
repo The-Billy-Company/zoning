@@ -1,0 +1,14 @@
+// Two ways to reach outside without permission: a module nobody was granted,
+// and a module somebody else was. The facade gets no exemption — it has no zone,
+// so only an unscoped grant reaches it, and a public entry point re-exporting a
+// new dependency is exactly the decision this law exists to surface.
+package stranger {
+    root   src
+    facade root.zig
+}
+
+zones {
+    lib  lib.zig
+}
+
+use ledger by lib

@@ -10,10 +10,12 @@
   - [Zones](#zones)
   - [Seals](#seals)
   - [Keeps](#keeps)
+  - [Grants](#grants)
   - [Structural Laws](#structural-laws)
   - [Variances](#variances)
-- [The Six Laws](#the-six-laws)
+- [The Seven Laws](#the-seven-laws)
 - [Reading a Map](#reading-a-map)
+- [Adopting It](#adopting-it)
 - [The Verbs](#the-verbs)
 - [Wiring It Into CI](#wiring-it-into-ci)
 - [Languages](#languages)
@@ -35,7 +37,7 @@ in a `.zone` file, and the tool judges that declaration against the real
 `@import` graph.
 
 ```
-✗ zoning [irregex]: 311 files, 1436 imports, 2 violation(s), 3 allowed
+✗ zoning [irregex]: 310 files, 1436 imports, 2 violation(s), 3 allowed
 src/kernel/regex/glean/differential_test.zig:32:1: [zone] zone `regex` imports up into `query` (`kernel/query/query.zig`) — imports may only point down the stack
 src/exec/cold/emit/render.zig:31:1: [seal] reaches past the seal on `kernel/scan/` into `kernel/scan/simd.zig` — enter through `kernel/scan/scan.zig`
 
@@ -48,8 +50,9 @@ Every failure closes with the remedy for its law. A gate whose output does not
 say what to do next is a gate somebody eventually silences.
 
 It reads the tree, not a build system; there is no project model to configure,
-no graph to rebuild, nothing to keep in step. Judging 311 files and 1436
-imports takes 30 milliseconds, from a static binary with zero dependencies.
+no graph to rebuild, nothing to keep in step. Judging 310 files and 1436
+imports takes 60 milliseconds wall clock, from a static binary with zero
+dependencies.
 
 ## Why Not a Code Review?
 
@@ -69,7 +72,8 @@ build the day it stops being true.
 ## Should You Be Using This?
 
 - **Python** – [import-linter](https://github.com/seddonym/import-linter)
-  already does this, over the boundary Python gives you.
+  already does this, over the boundary Python gives you. A `python` dialect is
+  the next one here; until it lands, use import-linter.
 - **Java** – [ArchUnit](https://www.archunit.org/), likewise.
 - **Go, wanting the boundary Go draws** – `go vet` and `internal/`, and nothing
   else to install.
@@ -114,8 +118,9 @@ is a whole one:
 
 ```
 package irregex {
-    root   src
-    facade root.zig
+    root     src
+    language zig
+    facade   root.zig
 }
 
 // Low to high. An import may not point up the page.
@@ -131,6 +136,9 @@ zones {
 seal kernel/regex through regex.zig     // enter a deep module by its door
 keep surface/api.zig to root.zig        // and this region has a guest list
 
+use build_options                       // and these imports may leave
+use irregex by ffi
+
 limit  reach to 5 hops
 forbid cycles across directories
 
@@ -145,9 +153,16 @@ reimplemented and pinned by tests against that reference.
 ### The Package Block
 
 `root` names the source directory, relative to the contract's grandparent
-(`contract/x.zone` → `../../src`). `facade` names the files that may reach
-anywhere: the module's public face, which by construction re-exports everything
-and therefore imports everything. `exclude` drops paths from judgment entirely.
+(`contract/x.zone` → `../../src`). `language` names the dialect this package is
+read in, so a monorepo holding several is still one run. `facade` names the files
+that may reach anywhere: the module's public face, which by construction
+re-exports everything and therefore imports everything. `exclude` drops paths
+from judgment entirely.
+
+The file that *declares* the package — `build.zig`, `pyproject.toml` — is never
+judged as part of it, in any dialect. A build script legitimately imports things
+no module file may, and a package whose contract made declaring it illegal would
+be a joke.
 
 ### Zones
 
@@ -180,6 +195,33 @@ silence ends: only the named importers may reach the subject at all.
 Two importers are always implicit and need no naming, the region's own insiders
 and a file's directory sibling, because `render.zig` importing `render_test.zig`
 is an aggregation idiom rather than an architectural crossing.
+
+`keep <subject> to nobody` is the limit case, for the region whose whole point is
+that nothing reaches it.
+
+### Grants
+
+Everything above governs where an import may point *inside* the package. `use`
+governs the ones that leave:
+
+```
+use build_options            // anywhere in the package
+use tokio by session cold    // only these zones
+```
+
+That scope is the reason the law exists. "The CLI face may talk to the network"
+and "any file in this package may talk to the network" are different
+architectures, and without a scope they are spelled the same way. A zone stack
+tells you `kernel/` sits under `surface/`; it will never tell you that a leaf
+three directories down started dialing an HTTP client, and that is the dependency
+that ends up hardest to remove.
+
+The standard library is exempt by construction, per dialect — `std`, `builtin`,
+`root` in Zig. Every zone has it, no zone chose it, and a contract that spent its
+lines declaring it would bury the handful of grants that are decisions.
+
+A grant nobody exercises is stale, and stale is a failure. It is a permission
+somebody forgot to withdraw.
 
 ### Structural Laws
 
@@ -216,9 +258,9 @@ folklore nobody dares touch, and this one can only shrink.
 nothing. A machine can find the edge; it cannot supply the reason, and the
 reason is the entire value.
 
-## The Six Laws
+## The Seven Laws
 
-Six, and closed on purpose. A boundary language whose vocabulary grows per
+Seven, and closed on purpose. A boundary language whose vocabulary grows per
 project stops being a language and becomes a config file.
 
 - **`zone`** – an import points up the stack.
@@ -227,8 +269,14 @@ project stops being a language and becomes a config file.
 - **`cycle`** – an import cycle crosses a directory boundary.
 - **`reach`** – an import climbs more `../` than the ceiling allows.
 - **`escape`** – an import climbs out of the module root entirely.
+- **`use`** – a zone imports an outside module no grant covers.
 
 Each exists because a compiler structurally cannot enforce it.
+
+Six of them are claims about how a package's files sit relative to each other, so
+a single-file module has almost nothing for a contract to say; `use` and `escape`
+are the two that still bind. `zoning list` says so rather than letting you write
+the file and wonder.
 
 ## Reading a Map
 
@@ -238,7 +286,7 @@ the page" stops being a rule you memorise and becomes a thing you can see:
 ```
 zoning map · irregex · 26 zones, high to low
 ──────────────────────────────────────────────────────────────────────────
- 25 │ ffi      ██············  7 ↓4      surface/ffi/**
+ 25 │ ffi      ██············  7 ↓5      surface/ffi/**
  24 │ api      █·············  2 ↓3    ⊘ surface/api.zig surface/api_test.…
  23 │ session  ██████········ 35 ↓13  ⊙  exec/session/**
  22 │ cold     ███████······· 44 ↓16  ⊙  exec/cold/**
@@ -247,11 +295,11 @@ zoning map · irregex · 26 zones, high to low
   8 │ regex    ██████████████ 92 ↓4   ⊙  kernel/regex/**
   7 │ scan     ███··········· 16 ↓4      kernel/scan/**
   5 │ math     ███··········· 18 ↓3      kernel/math/**
-  2 │ fault    █·············  1 ↓1      fault.zig
-  1 │ assay    █·············  5      ⊙  assay/**
-  0 │ portal   █·············  1         portal.zig
+  3 │ fault    █·············  1 ↓1      fault.zig
+  2 │ assay    █·············  5      ⊙  assay/**
+  1 │ portal   █·············  1         portal.zig
 ──────────────────────────────────────────────────────────────────────────
- 310 files · 1432 imports · 5 seals · 3 keeps · reach ≤ 5 hops
+ 310 files · 1436 imports · 5 seals · 3 keeps · 2 grants · reach ≤ 5 hops
  3 ratified variance(s) — each one names what would retire it
 ```
 
@@ -260,21 +308,86 @@ beneath it that zone actually reaches into, which is the number worth staring
 at: a zone that reaches into every zone below it is not a layer, it is a pile.
 `⊙` marks a sealed directory, `⊘` an anchored guest list.
 
+## Adopting It
+
+Every boundary tool is easy to love on a greenfield package and miserable to
+adopt on a real one. A tree with nine hundred files has an architecture already —
+it is simply undeclared — and the first contract somebody writes for it arrives
+red, which teaches the reader exactly one lesson: the gate is noise.
+
+So don't write the first one. Take it:
+
+```bash
+zoning list                   # every package here, governed or not
+zoning draft . --write        # the contract this graph already obeys
+zoning verify                 # green, on the first run
+```
+
+`list` prints the exact `draft` invocation for each ungoverned package, so the
+middle line is a paste rather than a guess — and it names the package what the
+package's own manifest names it, not what its directory happens to be called.
+
+`draft` derives the stack from a topological sort over directories, the grants
+from the modules the code already imports, and the reach ceiling from the reach
+the tree actually needs. Everything it emits is *true today*. Then the cleanup
+begins, and every step of it — merge two zones, seal a directory, drop a grant,
+lower the ceiling — is a decision somebody made on purpose rather than a fight
+with a wall.
+
+It refuses to guess at two things. Seals and keeps are claims — "this directory
+is a deep module", "these peers are independent" — and a machine inferring them
+from today's call sites would guess wrong the first time somebody adds a second
+legitimate caller. And a real import cycle comes out as a `variance` stanza with
+an empty reason, which does not parse: a draft over a genuinely tangled package
+cannot be adopted until a person has written why each tangle stays.
+
+Directories that import each other cannot be ordered, so they land in one zone,
+and that zone is called `tangle`. A zone nobody enjoys reading is a zone somebody
+eventually splits.
+
+The question you actually have day to day is narrower, and `explain` answers it
+without a contract edit or a full run:
+
+```bash
+zoning explain src/exec/cold/emit/render.zig            # where does this file stand?
+zoning explain src/kernel/math/sqrt.zig src/portal.zig  # may I write this import?
+```
+
+The second form works whether or not the import exists yet, which is the point:
+every tool in this class makes you write the line and run the whole gate to find
+out. Paths are taken as typed, resolved against your shell's own directory — the
+way an editor tab has it. And when a path is real but unjudged it says which of
+the four reasons applies, because "untracked by git" and "excluded by the
+contract" call for opposite actions.
+
+The verdict reaches the exit code, so the question is also a shell question:
+
+```bash
+zoning explain from.zig to.zig && $EDITOR from.zig
+```
+
 ## The Verbs
 
 - **`verify`** – does the code obey the contract. The default, and what CI runs.
 - **`status`** – verify, plus the census: files per zone, hop histogram, what is
   sealable for free, and the entry-file bypass count for everything still open.
-- **`list`** – which packages are governed, and which are not.
+- **`list`** – every package in the tree, governed or not, with the next command
+  for each.
 - **`show`** – the resolved contract, as zoning understood it rather than as you
   typed it.
 - **`map`** – the stack, drawn.
+- **`explain FILE`** – one file's zone, reach, grants, and importers.
+- **`explain FROM TO`** – whether that one import is legal, and the clause that
+  decides.
+- **`draft DIR`** – the contract `DIR`'s graph already obeys. `--write` files it.
 
 Options: `--package NAME`, `--under DIR` (monorepos), `--root PATH`,
-`--dialect NAME`, `--untracked`, `--suggest`, `--json`, `--no-color`.
+`--language NAME`, `--complete`, `--write`, `--untracked`, `--suggest`, `--json`,
+`--no-color`.
 
 Exit codes: `0` clean, `1` a violation or a stale declaration, `2` the contract
-or the invocation is malformed.
+or the invocation is malformed. `explain` uses the same three, so `1` there means
+the file is in violation or the import is not allowed.
 
 ## Wiring It Into CI
 
@@ -282,16 +395,30 @@ One step, and no Rust toolchain in the job:
 
 ```yaml
 - name: Import topology
-  run: uv run --no-project --with zoning==0.1.0 zoning verify
+  run: uv run --no-project --with zoning==1.0.0 zoning verify --complete
 ```
 
 No build, no compile database, no network beyond fetching itself. Pin the
 version: a gate whose verdict can change without a commit is not a gate.
 
+`--complete` adds the one claim no law can make: every package in scope has a
+contract. Without it a clean run says nothing whatsoever about the package
+somebody added last week, and adoption that cannot notice a new ungoverned
+package rots back toward zero, one package at a time.
+
+It forgives a vendored dependency, and on the right authority. A vendored package
+is a package by every test this tool can run — manifest, source, an import graph —
+and it is nonetheless not yours: its architecture is decided in the repository it
+came from, which is where its contract lives. The obvious fix is an allowlist,
+which drifts the moment somebody vendors a second thing, so the dialect reads the
+manifest instead. `build.zig.zon` spells one `.brigade = .{ .path = "brigade" }`,
+and a build that had not said so would not link. The fact is already written down
+and the compiler maintains it.
+
 With a toolchain already in the job, the same binary comes from crates.io:
 
 ```yaml
-- run: cargo install zoning --locked && zoning verify
+- run: cargo install zoning --locked && zoning verify --complete
 ```
 
 ## Languages
@@ -308,12 +435,23 @@ only what genuinely varies:
 - how an import is spelled,
 - whether a given spec names a path inside the module or a dependency outside
   it,
-- and the comment and string conventions, so imports are read from code alone
-  rather than from a line that mentions one.
+- the comment and string conventions, so imports are read from code alone rather
+  than from a line that mentions one,
+- which filenames declare a package, so `list` can find one nobody has governed,
+- what name a manifest gives the package it declares, so a contract is called
+  what the build already calls it,
+- which modules the language always provides, so no contract spends a `use` line
+  on the standard library,
+- and which directories a manifest calls an in-tree dependency, so coverage knows
+  whose package is whose.
 
-Resolution, the graph, all six laws, and every rendering are shared. That is on
+Resolution, the graph, all seven laws, and every rendering are shared. That is on
 purpose: a dialect that could resolve paths its own way is a dialect that could
 disagree with the others about what a cycle is.
+
+A contract names its own `language`, so a polyglot monorepo is one run rather than
+one run per dialect. `--language` sets the default for a package that has not
+said.
 
 ## Build and Test
 
@@ -329,7 +467,9 @@ cargo clippy --all-targets
 this was rewritten from. It mutates each real contract the way a person breaks
 one; drop every seal, drop every guest list, squeeze the reach ceiling, revoke
 every variance, invert the entire stack; and requires both implementations to
-produce the same set of findings, law by law and file by file.
+produce the same set of findings, law by law and file by file. It covers the six
+laws both implementations have; `use` postdates the rewrite and is pinned by
+`tests/fixtures/` instead.
 
 Agreeing on a clean tree proves nothing, because every gate agrees that nothing
 is wrong.

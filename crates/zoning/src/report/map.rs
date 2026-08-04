@@ -77,12 +77,14 @@ pub fn map(ordinance: &Ordinance, survey: &Survey, ink: Ink) -> String {
         ordinance.max_hops.map_or_else(|| "unbounded".to_owned(), |n| format!("≤ {n} hops"));
     let _ = write!(
         out,
-        "{dim}{}{reset}\n {} files · {} imports · {} seals · {} keeps · reach {reach}\n",
+        "{dim}{}{reset}\n {} files · {} imports · {} seals · {} keeps · {} grants · \
+         reach {reach}\n",
         "─".repeat(RULE),
         survey.files.len(),
         survey.edges.len(),
         ordinance.seals.len(),
         ordinance.keeps.len(),
+        ordinance.uses.len(),
     );
     if !ordinance.variances.is_empty() {
         let _ = writeln!(

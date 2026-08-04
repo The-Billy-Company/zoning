@@ -4,24 +4,29 @@
 //!
 //! ```text
 //! file     = { decl } END
-//! decl     = package | zones | seal | keep | limit | forbid | variance
+//! decl     = package | zones | seal | keep | use | limit | forbid | variance
 //! package  = "package" WORD "{" BREAK { setting BREAK } "}" BREAK
-//! setting  = "root" WORD | "facade" paths | "exclude" paths
+//! setting  = "root" WORD | "language" WORD | "facade" paths | "exclude" paths
 //! zones    = "zones" "{" BREAK { WORD paths BREAK } "}" BREAK
 //! paths    = WORD... | "{" BREAK { WORD... BREAK } "}"
 //! seal     = "seal" WORD "through" WORD [ "open" "to" paths ] BREAK
-//! keep     = "keep" WORD "to" paths BREAK
+//! keep     = "keep" WORD "to" ( paths | "nobody" ) BREAK
+//! use      = "use" WORD... [ "by" paths ] BREAK
 //! limit    = "limit" "reach" "to" INT "hops" BREAK
 //! forbid   = "forbid" "cycles" "across" "directories" BREAK
 //! variance = "variance" ( edge | cycle )
 //! edge     = LAW WORD "->" WORD "because" TEXT BREAK
 //! cycle    = "cycle" "{" BREAK { WORD BREAK } "}" "because" TEXT BREAK
-//! LAW      = "zone" | "seal" | "keep" | "cycle" | "reach" | "escape"
+//! LAW      = "zone" | "seal" | "keep" | "cycle" | "reach" | "use" | "escape"
 //! ```
 //!
 //! `keep` takes a single subject rather than a `paths` list so the inline form
 //! stays unambiguous against its own `to` — and because one claim per line is what
 //! lets each keep carry the comment that justifies it.
+//!
+//! `use` is the one declaration whose subjects are not paths: a module name the
+//! build system resolves, not a file this package owns. Its `by` list is scopes —
+//! zone names, or path globs where a grant is narrower than a whole zone.
 //!
 //! Zones are listed low to high, and that vertical order *is* the stack: reading
 //! down the block is reading up the architecture. `because` sits in the grammar
@@ -38,6 +43,7 @@ use super::lex::{Kind, Token, tokenize};
 pub(super) struct Package {
     pub name: Token,
     pub root: Option<Token>,
+    pub language: Option<Token>,
     pub facade: Vec<Token>,
     pub exclude: Vec<Token>,
 }
@@ -55,10 +61,18 @@ pub(super) struct Seal {
     pub open: Vec<Token>,
 }
 
-/// One `keep REGION to IMPORTERS…`.
+/// One `keep REGION to IMPORTERS…`. An empty list is `to nobody`, written out.
 pub(super) struct Keep {
     pub subject: Token,
     pub importers: Vec<Token>,
+}
+
+/// One `use MODULE… [by SCOPE…]`. An empty `by` list grants every zone.
+pub(super) struct Use {
+    pub modules: Vec<Token>,
+    pub scope: Vec<Token>,
+    /// The `use` keyword itself, for locating a fault or a stale grant.
+    pub lead: Token,
 }
 
 /// One ratified exception. `because` is grammar, so `reason` is never empty.
@@ -75,6 +89,7 @@ pub(super) struct Tree {
     pub zones: Vec<Zone>,
     pub seals: Vec<Seal>,
     pub keeps: Vec<Keep>,
+    pub uses: Vec<Use>,
     pub variances: Vec<Variance>,
     pub reach: Option<(u32, Span)>,
 }
@@ -191,13 +206,15 @@ impl Reader<'_> {
         let mut package = None;
         let mut zones = Vec::new();
         let mut seen_zones = false;
-        let (mut seals, mut keeps, mut variances) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut seals, mut keeps, mut uses) = (Vec::new(), Vec::new(), Vec::new());
+        let mut variances = Vec::new();
         let mut reach = None;
 
         self.skip_blank();
         while self.head().kind != Kind::End {
-            let lead =
-                self.keyword(&["package", "zones", "seal", "keep", "limit", "forbid", "variance"])?;
+            let lead = self.keyword(&[
+                "package", "zones", "seal", "keep", "use", "limit", "forbid", "variance",
+            ])?;
             match lead.text.as_str() {
                 "package" => {
                     if package.is_some() {
@@ -222,6 +239,7 @@ impl Reader<'_> {
                 }
                 "seal" => seals.push(self.seal()?),
                 "keep" => keeps.push(self.keep()?),
+                "use" => uses.push(self.uses(lead)?),
                 "limit" => reach = Some(self.limit()?),
                 "forbid" => self.forbid()?,
                 _ => variances.push(self.variance()?),
@@ -238,19 +256,21 @@ impl Reader<'_> {
                 self.at(&head, "no `zones` block — a contract with no zones governs nothing")
             );
         }
-        Ok(Tree { package, zones, seals, keeps, variances, reach })
+        Ok(Tree { package, zones, seals, keeps, uses, variances, reach })
     }
 
     fn package(&mut self, lead: &Token) -> Result<Package, Fault> {
         let name = self.word("the package name")?;
         self.block(lead)?;
-        let (mut root, mut facade, mut exclude) = (None, Vec::new(), Vec::new());
+        let (mut root, mut language) = (None, None);
+        let (mut facade, mut exclude) = (Vec::new(), Vec::new());
         while self.head().kind != Kind::Close {
             if self.head().kind == Kind::End {
                 return Err(self.fail("`}` to close the `package` block"));
             }
-            match self.keyword(&["root", "facade", "exclude"])?.text.as_str() {
+            match self.keyword(&["root", "language", "facade", "exclude"])?.text.as_str() {
                 "root" => root = Some(self.word("the source root directory")?),
+                "language" => language = Some(self.word("the language name")?),
                 "facade" => facade.extend(self.paths("a facade path")?),
                 _ => exclude.extend(self.paths("a path to exclude")?),
             }
@@ -259,7 +279,7 @@ impl Reader<'_> {
         }
         self.bump();
         self.endline()?;
-        Ok(Package { name, root, facade, exclude })
+        Ok(Package { name, root, language, facade, exclude })
     }
 
     fn zones(&mut self, lead: &Token) -> Result<Vec<Zone>, Fault> {
@@ -294,12 +314,42 @@ impl Reader<'_> {
         Ok(Seal { path, entry, open })
     }
 
+    /// `keep REGION to IMPORTERS…`, or `to nobody` for a region with no way in.
+    ///
+    /// `nobody` is spelled rather than expressed as an empty list because a guest
+    /// list nobody is on is a strong claim — the region is reachable only from
+    /// inside itself — and it should read like one instead of looking like a line
+    /// somebody forgot to finish.
     fn keep(&mut self) -> Result<Keep, Fault> {
         let subject = self.word("the region to keep")?;
         self.keyword(&["to"])?;
-        let importers = self.paths("an importer allowed to reach it")?;
+        if self.looking_at(&["nobody"]) {
+            self.bump();
+            self.endline()?;
+            return Ok(Keep { subject, importers: Vec::new() });
+        }
+        let importers = self.paths("an importer allowed to reach it, or `nobody`")?;
         self.endline()?;
         Ok(Keep { subject, importers })
+    }
+
+    /// `use MODULE… [by SCOPE…]` — what this package may reach outside itself.
+    ///
+    /// Several modules may share one line because they usually share one reason
+    /// (`use gist irregex by face`), and an omitted `by` grants every zone, which is
+    /// the common case and should cost one word.
+    fn uses(&mut self, lead: Token) -> Result<Use, Fault> {
+        let mut modules = vec![self.word("an outside module name")?];
+        while self.head().kind == Kind::Word && self.head().text != "by" {
+            modules.push(self.bump());
+        }
+        let mut scope = Vec::new();
+        if self.looking_at(&["by"]) {
+            self.bump();
+            scope = self.paths("a zone name or path glob the grant covers")?;
+        }
+        self.endline()?;
+        Ok(Use { modules, scope, lead })
     }
 
     fn limit(&mut self) -> Result<(u32, Span), Fault> {

@@ -10,16 +10,41 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Directories no source walk should ever enter.
-const SKIP: [&str; 8] = [
+/// Directories no walk should ever enter — build output, dependency trees, caches.
+///
+/// Deliberately conservative about generic names: `build/`, `dist/`, `out/` and
+/// `lib/` are output in some layouts and hand-written source in others, and a walk
+/// that silently skipped a source directory would hand back a verdict about a
+/// module it had only partly read. Anything genuinely generated that is *not* here
+/// belongs in the package's own `exclude`, where it is at least written down.
+pub const SKIP: &[&str] = &[
+    ".git",
+    ".hg",
+    ".svn",
+    ".jj",
     "zig-out",
     ".zig-cache",
     "zig-cache",
     "target",
     "vendor",
     "node_modules",
-    ".git",
+    ".pnpm-store",
     "__pycache__",
+    ".venv",
+    "venv",
+    "site-packages",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".tox",
+    ".cache",
+    ".local",
+    ".turbo",
+    ".next",
+    ".parcel-cache",
+    ".swiftpm",
+    "DerivedData",
+    "Pods",
 ];
 
 /// Every source file under `root`, as (absolute path, root-relative posix path).

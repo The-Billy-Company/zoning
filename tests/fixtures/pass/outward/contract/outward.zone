@@ -1,0 +1,21 @@
+// Everything the seventh law can say, all of it satisfied: a grant scoped by
+// zone name, a grant scoped by glob, an ambient module that needs no grant at
+// all, and a facade pinned as importable by nobody inside the package.
+package outward {
+    language zig
+    root     src
+    facade   root.zig
+}
+
+zones {
+    vault vault/**
+    gate  gate.zig
+}
+
+use ledger by gate
+use tally  by vault/**
+
+keep root.zig to nobody
+
+limit  reach to 2 hops
+forbid cycles across directories

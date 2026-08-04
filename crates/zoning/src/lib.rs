@@ -29,25 +29,28 @@
 //! variance zone a.zig -> b.zig because "…and here is what retires it"
 //! ```
 //!
-//! Six laws, one exception mechanism, and every exception must say how it gets
+//! Seven laws, one exception mechanism, and every exception must say how it gets
 //! retired — a variance that stops matching is a hard failure, so paying the debt
 //! forces deleting the entry. Exception lists shrink instead of accreting.
 //!
 //! # The shape of the tool
 //!
-//! Four modules, each deep enough to be worth its boundary:
+//! Five modules, each deep enough to be worth its boundary:
 //!
 //! | Module | Question it owns |
 //! |---|---|
 //! | [`ordinance`] | What does this contract say, and is it believable? |
 //! | [`survey`] | What does the code actually import? |
 //! | [`judge`] | Where do those two disagree? |
+//! | [`draft`] | What contract would this graph already obey? |
 //! | [`report`] | How does a person or a machine read the answer? |
 //!
 //! [`survey`] is where languages beyond Zig arrive: a [`survey::Dialect`] carries
 //! only what genuinely varies — extensions, how an import is spelled, whether a spec
-//! names something local — while resolution, the graph, and all six laws stay
-//! shared. Two dialects cannot disagree about what a cycle is.
+//! names something local, which modules the language hands out for free — while
+//! resolution, the graph, and all seven laws stay shared. Two dialects cannot
+//! disagree about what a cycle is. A contract names its own language, so one run
+//! judges a polyglot repository.
 //!
 //! # As a library
 //!
@@ -55,14 +58,14 @@
 //! use std::path::Path;
 //! use zoning::{judge, ordinance::Ordinance, survey::{Ask, Survey}};
 //!
-//! let contract = Ordinance::read(Path::new("contract/irregex.zone"))?;
-//! let dialect = zoning::survey::dialect("zig").expect("the zig dialect ships in-tree");
+//! let zig = zoning::survey::dialect("zig").expect("the zig dialect ships in-tree");
+//! let contract = Ordinance::read(Path::new("contract/irregex.zone"), zig)?;
 //! let repo = Path::new(".");
 //! let found = Survey::of(&Ask {
 //!     repo_root: repo,
 //!     module_root: &contract.module_root,
 //!     exclude: &contract.exclude,
-//!     dialect,
+//!     dialect: contract.dialect,
 //!     tracked: None,
 //! });
 //! let verdict = judge::judge(&found, &contract);
@@ -70,6 +73,7 @@
 //! # Ok::<(), zoning::ordinance::Fault>(())
 //! ```
 
+pub mod draft;
 pub mod judge;
 pub mod ordinance;
 pub mod pattern;

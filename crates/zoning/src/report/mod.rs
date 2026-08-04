@@ -6,10 +6,12 @@
 //! record per finding, for whatever reads it. The map is the contract as a picture:
 //! the stack, top to bottom, with the weight of each zone beside it.
 
+mod explain;
 mod human;
 mod json;
 mod map;
 
+pub use explain::{edge, file};
 pub use human::{show, suggest, verdict};
 pub use json::records;
 pub use map::map;
