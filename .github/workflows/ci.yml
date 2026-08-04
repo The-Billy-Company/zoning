@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # The soak only. Everything else is already proven per commit.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +19,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
+  # A property failure prints the seed that produced it; a backtrace says where.
+  RUST_BACKTRACE: 1
 
 jobs:
   check:
@@ -121,6 +127,35 @@ jobs:
           uv run --no-project --with "$(ls "$GITHUB_WORKSPACE"/dist/*.whl)" zoning verify --untracked
       - name: Metadata is publishable
         run: uv run --no-project --with 'twine>=6' twine check dist/*
+
+  # The per-commit suite runs a few hundred generated packages, which is sized to keep a
+  # PR fast rather than to search hard. This runs the same code at fifty times the case
+  # count, in release, from a seed nobody has used before - the run id - so each night
+  # covers ground the last one did not. A failure prints `ZONING_SEED=…`, and pasting that
+  # in front of `cargo test` replays it exactly, which is the only part of shrinking that
+  # matters at this size.
+  #
+  # Deliberately outside `release-ready`: a soak that found something new must not
+  # retroactively block a tag on a commit that was green when it was cut. It opens no PR
+  # and pages nobody - the failure is in the run log, where the next person to look at the
+  # schedule will find it.
+  soak:
+    if: github.event_name != 'pull_request'
+    name: soak the generators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: properties and fuzz, wider and from a fresh seed
+        env:
+          ZONING_CASES: "5000"
+          ZONING_SEED: ${{ github.run_id }}
+        run: cargo test --release --test properties --test fuzz
 
   # These files are the only thing here that nothing else type-checks. A
   # workflow with an expression in a place the context is not available does not
