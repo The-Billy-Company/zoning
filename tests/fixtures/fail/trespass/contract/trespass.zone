@@ -1,0 +1,12 @@
+package trespass {
+    root   src
+    facade root.zig
+}
+
+zones {
+    low     low.zig
+    private vault/**
+    other   other.zig
+}
+
+keep vault/private.zig to root.zig

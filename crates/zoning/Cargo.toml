@@ -1,0 +1,28 @@
+[package]
+name = "zoning"
+description = "An import-topology gate: declare the zones a package's imports may cross, and judge the real import graph against them."
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+# No dependencies, on purpose. A gate that runs in everyone's CI should be a
+# static binary you can audit in an afternoon, not a supply chain.
+[dependencies]
+
+[lib]
+name = "zoning"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zoning"
+path = "src/main.rs"
+
+[lints]
+workspace = true

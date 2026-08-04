@@ -1,0 +1,29 @@
+zoning — an import-topology gate
+Copyright 2026 The Billy Company
+
+This product includes software developed at The Billy Company
+(https://billylives.com/).
+
+No third-party source or data is bundled here, and the crate declares no
+dependencies: a gate that runs in everyone's CI should be a static binary you
+can audit in an afternoon, not a supply chain. The glob matcher, the argument
+parser, the JSON writer, and the cycle finder are all written here for that
+reason.
+
+Two behaviours are implemented from published specification rather than from
+borrowed source, and are credited where they are used:
+
+  * Pattern semantics follow CPython's `glob.translate(..., recursive=True,
+    include_hidden=True)`, so a `.zone` glob means exactly what the same glob
+    means to a Python reader. The test suite in `crates/zoning/src/pattern.rs`
+    pins each case against that reference.
+
+  * Cycle detection is Tarjan's strongly-connected-components algorithm
+    (R. Tarjan, "Depth-first search and linear graph algorithms", SIAM Journal
+    on Computing 1:2, 1972), written iteratively so a deep import chain cannot
+    overflow the stack.
+
+The design owes its shape to two ideas it did not invent: deep modules with
+small interfaces, from John Ousterhout's *A Philosophy of Software Design*; and
+the practice of declaring an allowed import graph rather than discovering one,
+as in import-linter, ArchUnit, and Go's `internal/` rule.

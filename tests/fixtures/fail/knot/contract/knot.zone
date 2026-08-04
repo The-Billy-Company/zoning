@@ -1,0 +1,10 @@
+package knot {
+    root   src
+    facade root.zig
+}
+
+zones {
+    both  a/** b/**
+}
+
+forbid cycles across directories

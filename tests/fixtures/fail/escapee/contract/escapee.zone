@@ -1,0 +1,8 @@
+package escapee {
+    root   src
+    facade root.zig
+}
+
+zones {
+    all   **/*.zig
+}

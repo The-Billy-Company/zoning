@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: fmt · clippy · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features
+      - run: cargo test --all-features
+
+  # The tool judging itself. zoning's own tree is Rust, so there is no `.zone`
+  # contract to check here yet; what this proves is that the binary runs, parses
+  # a real contract, and exits the way a gate must.
+  dogfood:
+    name: judge a real contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - name: fixtures pass, and their mutations fail
+        run: |
+          set -euo pipefail
+          Z=target/release/zoning
+          for box in tests/fixtures/pass/*/; do
+            echo "::group::$box"
+            (cd "$box" && "$GITHUB_WORKSPACE/$Z" verify --untracked)
+            echo "::endgroup::"
+          done
+          for box in tests/fixtures/fail/*/; do
+            echo "::group::$box"
+            if (cd "$box" && "$GITHUB_WORKSPACE/$Z" verify --untracked); then
+              echo "::error::$box was expected to fail and did not"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done
+
+  # A binary people install into their CI must build where their CI runs.
+  portability:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --release
+
+  msrv:
+    name: rust ${{ env.MSRV }}
+    runs-on: ubuntu-latest
+    env:
+      MSRV: "1.85"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-features

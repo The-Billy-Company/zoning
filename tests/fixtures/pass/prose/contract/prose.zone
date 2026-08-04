@@ -1,0 +1,10 @@
+// Imports named only in a comment or a string are not imports.
+package prose {
+    root   src
+    facade root.zig
+}
+
+zones {
+    low   low.zig
+    high  high.zig
+}

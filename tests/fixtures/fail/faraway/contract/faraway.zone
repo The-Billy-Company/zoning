@@ -1,0 +1,10 @@
+package faraway {
+    root   src
+    facade root.zig
+}
+
+zones {
+    all   **/*.zig
+}
+
+limit  reach to 1 hops

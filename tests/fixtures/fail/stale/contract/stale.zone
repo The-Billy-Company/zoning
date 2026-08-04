@@ -1,0 +1,14 @@
+// The debt was paid and the exception outlived it. That is a failure: an
+// exception list that cannot shrink becomes folklore.
+package stale {
+    root   src
+    facade root.zig
+}
+
+zones {
+    low   low.zig
+    high  high.zig
+}
+
+variance zone low.zig -> high.zig
+    because "There is no such import any more, so this must be deleted."

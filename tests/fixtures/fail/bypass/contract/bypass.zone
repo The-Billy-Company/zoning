@@ -1,0 +1,11 @@
+package bypass {
+    root   src
+    facade root.zig
+}
+
+zones {
+    engine engine/**
+    caller caller.zig
+}
+
+seal engine through engine.zig

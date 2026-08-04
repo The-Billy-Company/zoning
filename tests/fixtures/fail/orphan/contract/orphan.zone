@@ -1,0 +1,10 @@
+// A file no zone claims is the law having nothing to say, which is worse
+// than the law saying no.
+package orphan {
+    root   src
+    facade root.zig
+}
+
+zones {
+    known  known.zig
+}

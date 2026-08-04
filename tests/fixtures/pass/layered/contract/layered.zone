@@ -1,0 +1,23 @@
+// Every construct the language has, all of them satisfied.
+package layered {
+    root   src
+    facade root.zig
+}
+
+zones {
+    floor  floor.zig
+    engine engine/**
+    face   face.zig
+}
+
+seal engine through engine.zig
+keep face.zig to root.zig
+
+limit  reach to 2 hops
+forbid cycles across directories
+
+variance seal face.zig -> engine/parts.zig
+    because
+        \\The demo needs one spent variance, and a seal bypass is the only law
+        \\this package can break without also tripping another. Retire it by
+        \\re-exporting what `face.zig` wants from `engine.zig`.

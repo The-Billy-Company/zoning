@@ -1,0 +1,34 @@
+[workspace]
+resolver = "3"
+members = ["crates/zoning"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/The-Billy-Company/zoning"
+homepage = "https://github.com/The-Billy-Company/zoning"
+authors = ["Griffin Strier <griffin@billylives.com>"]
+keywords = ["architecture", "lint", "imports", "dependencies", "zig"]
+categories = ["development-tools", "development-tools::build-utils"]
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# The judged corpus is a source tree; counts are small and always fit.
+cast_possible_truncation = "allow"
+module_name_repetitions = "allow"
+# Every fallible path in this tool returns a diagnostic a human reads.
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
