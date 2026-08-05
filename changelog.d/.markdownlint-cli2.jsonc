@@ -1,0 +1,9 @@
+// A fragment folds verbatim into ../CHANGELOG.md as prose under the version's
+// own category heading (see README.md) — a heading inside the fragment would
+// duplicate that structure, so MD041 does not apply in this directory.
+{
+  "extends": "../.markdownlint-cli2.jsonc",
+  "config": {
+    "MD041": false
+  }
+}

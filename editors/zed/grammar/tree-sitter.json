@@ -1,0 +1,37 @@
+{
+  "grammars": [
+    {
+      "name": "zoning",
+      "camelcase": "Zoning",
+      "scope": "source.zoning",
+      "path": ".",
+      "file-types": [
+        "zone"
+      ],
+      "highlights": "../languages/zoning/highlights.scm",
+      "injection-regex": "^zoning$"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "license": "Apache-2.0",
+    "description": "Architecture contracts for real import graphs.",
+    "authors": [
+      {
+        "name": "Griffin Strier",
+        "email": "griffin@billylives.com"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/The-Billy-Company/zoning"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": false,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false
+  }
+}

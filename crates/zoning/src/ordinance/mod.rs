@@ -152,6 +152,18 @@ pub struct Ordinance {
     granted: HashMap<(Law, String), usize>,
 }
 
+/// Result of analysing an in-memory `.zone` document.
+///
+/// Editors own unsaved source buffers, so analysis cannot require a temporary
+/// file. A malformed document still returns diagnostics while
+/// [`Ordinance::read`] keeps its established fail-fast command-line contract.
+pub struct Analysis {
+    /// Resolved ordinance when the document is complete and valid.
+    pub ordinance: Option<Ordinance>,
+    /// Recoverable syntax or resolution diagnostics.
+    pub faults: Vec<Fault>,
+}
+
 impl Ordinance {
     /// Read, parse, and resolve one `.zone` file.
     ///
@@ -165,7 +177,28 @@ impl Ordinance {
     pub fn read(path: &Path, fallback: &'static dyn Dialect) -> Result<Self, Fault> {
         let source =
             fs::read_to_string(path).map_err(|e| Fault::at(e.to_string(), Span::head(path), ""))?;
-        resolve(parse::parse(&source, path)?, path, &source, fallback)
+        Self::from_source(path, &source, fallback)
+    }
+
+    /// Resolve a contract from caller-owned source.
+    ///
+    /// # Errors
+    /// Returns the first syntax or semantic fault, matching [`Ordinance::read`].
+    pub fn from_source(
+        path: &Path,
+        source: &str,
+        fallback: &'static dyn Dialect,
+    ) -> Result<Self, Fault> {
+        resolve(parse::parse(source, path)?, path, source, fallback)
+    }
+
+    /// Analyse an unsaved editor buffer without touching the filesystem.
+    #[must_use]
+    pub fn analyze(path: &Path, source: &str, fallback: &'static dyn Dialect) -> Analysis {
+        match Self::from_source(path, source, fallback) {
+            Ok(ordinance) => Analysis { ordinance: Some(ordinance), faults: Vec::new() },
+            Err(fault) => Analysis { ordinance: None, faults: vec![fault] },
+        }
     }
 
     /// The variance ratifying `law` over `subject`, if one was written.

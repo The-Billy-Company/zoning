@@ -128,6 +128,35 @@ jobs:
       - name: Metadata is publishable
         run: uv run --no-project --with 'twine>=6' twine check dist/*
 
+  editors:
+    name: editor payload · LSP adapters
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+          targets: wasm32-wasip1
+      - name: Cursor and VS Code
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npm run package
+          git diff --exit-code -- ../../crates/zoning/src/setup/payload/zoning.vsix
+      - name: Zed grammar
+        working-directory: editors/zed/grammar
+        run: |
+          npm ci
+          npm test
+      - name: Zed extension
+        run: cargo check --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1
+      - name: Vim runtime
+        run: vim -Nu NONE -n -es -S editors/vim/test/runtime.vim
+      - name: Embedded package still compiles
+        run: cargo check --locked
+
   # The per-commit suite runs a few hundred generated packages, which is sized to keep a
   # PR fast rather than to search hard. This runs the same code at fifty times the case
   # count, in release, from a seed nobody has used before - the run id - so each night
@@ -215,7 +244,7 @@ jobs:
   # upstream failed, which is exactly the case it has to report on.
   release-ready:
     if: always()
-    needs: [check, dogfood, portability, wheel, actions, msrv, changelog]
+    needs: [check, dogfood, portability, wheel, editors, actions, msrv, changelog]
     runs-on: ubuntu-latest
     steps:
       - name: every required job is green

@@ -5,6 +5,7 @@
 - [Should You Be Using This?](#should-you-be-using-this)
 - [Support](#support)
 - [Install](#install)
+- [Editor Language](#editor-language)
 - [The Language](#the-language)
   - [The Package Block](#the-package-block)
   - [Zones](#zones)
@@ -50,9 +51,9 @@ Every failure closes with the remedy for its law. A gate whose output does not
 say what to do next is a gate somebody eventually silences.
 
 It reads the tree, not a build system; there is no project model to configure,
-no graph to rebuild, nothing to keep in step. Judging 310 files and 1436
-imports takes 60 milliseconds wall clock, from a static binary with zero
-dependencies.
+no graph to rebuild, nothing to keep in step. The judge stays std-only. The
+installed executable also carries a narrow, MSRV-checked protocol stack for its
+in-process language server.
 
 ## Why Not a Code Review?
 
@@ -110,6 +111,47 @@ Or build it here:
 ```bash
 cargo build --release         # target/release/zoning
 ```
+
+The first interactive run detects Cursor, VS Code, Zed, Neovim, and Vim and
+installs the matching adapter. It never mutates an editor home under `CI`, from
+a non-terminal process, when `ZONING_NO_SETUP=1`, or while serving LSP. The
+explicit lifecycle is always available:
+
+```bash
+zoning setup status
+zoning setup run
+zoning setup repair
+zoning setup uninstall
+```
+
+## Editor Language
+
+`.zone` is a real editor language, not a filename with borrowed highlighting.
+The same executable serves diagnostics and language intelligence:
+
+```bash
+zoning lsp --stdio
+```
+
+Cursor and VS Code receive the exact SVG file identity plus completion, hover,
+navigation, symbols, folding, semantic tokens, formatting, zone rename, and
+safe code actions. The embedded VSIX launches the separately installed
+`zoning` binary; the extension never downloads another executable.
+
+Zed receives a native extension, Tree-sitter grammar, and the same LSP once its
+registry submission lands. Zed does not expose a local-extension install CLI,
+so setup adds `zoning` to `auto_install_extensions` without reformatting the
+rest of the user's JSONC. Its default icon theme submission is separate because
+Zed forbids language extensions from carrying icon themes.
+
+Vim and Neovim receive file detection, syntax, indentation, folding, and LSP
+client registration. Neovim 0.11 starts the server natively; Vim connects
+through an installed supported client. Terminal editors cannot render SVG file
+icons, so the runtime uses a Nerd Font glyph with Unicode and ASCII fallbacks.
+
+Setup state is versioned and owned by zoning. Repair is idempotent; uninstall
+removes only files recorded by zoning and leaves unrelated editor settings
+alone.
 
 ## The Language
 

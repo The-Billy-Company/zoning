@@ -1,0 +1,7 @@
+name = "Zoning"
+grammar = "zoning"
+path_suffixes = ["zone"]
+line_comments = ["// "]
+tab_size = 4
+hard_tabs = false
+word_characters = ["-", "/", ".", "*"]

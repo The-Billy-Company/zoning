@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-labelledby="title">
+  <title id="title">Zoning for dark backgrounds</title>
+  <g fill="#f3f5f7">
+    <path d="M3 1h10v4H3zM1 6h10v4H1zM5 11h10v4H5z"/>
+  </g>
+</svg>

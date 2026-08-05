@@ -1,0 +1,10 @@
+{
+  "file_suffixes": {
+    "zone": "zoning"
+  },
+  "file_icons": {
+    "zoning": {
+      "path": "assets/icons/file_icons/zoning.svg"
+    }
+  }
+}

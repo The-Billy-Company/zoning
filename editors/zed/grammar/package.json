@@ -1,0 +1,21 @@
+{
+  "name": "tree-sitter-zoning",
+  "version": "1.0.0",
+  "description": "Tree-sitter grammar for Zoning architecture contracts.",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/The-Billy-Company/zoning",
+  "main": "bindings/node",
+  "types": "bindings/node",
+  "files": [
+    "grammar.js",
+    "src/**",
+    "tree-sitter.json"
+  ],
+  "scripts": {
+    "generate": "tree-sitter generate --abi=14",
+    "test": "tree-sitter generate --abi=14 && tree-sitter test"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.25.10"
+  }
+}

@@ -1,0 +1,20 @@
+*zoning.txt*                    Zoning architecture contracts
+
+Install this directory on 'runtimepath'. Files ending in .zone receive the
+zoning filetype, syntax, indentation, folding, and language-server support.
+
+The executable is never bundled. Set this before the plugin loads if `zoning`
+is not on PATH:
+>
+  let g:zoning_executable = '/absolute/path/to/zoning'
+<
+Neovim 0.11 uses its native |vim.lsp.enable()| configuration. Vim detects
+vim-lsp, vim-lsc, ALE, and coc.nvim when they are already installed.
+
+Terminal icons do not use SVG. |zoning#icon()| returns `≡` by default:
+>
+  let g:zoning_nerd_font = 1       " 󰙅
+  let g:zoning_ascii_icon = 1      " [=]
+<
+==============================================================================
+vim:tw=78:ts=8:noet:ft=help:norl:

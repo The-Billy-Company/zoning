@@ -1,0 +1,110 @@
+{
+  "name": "zoning",
+  "displayName": "Zoning",
+  "description": "Architecture contracts and language intelligence for .zone files.",
+  "version": "1.0.0",
+  "publisher": "the-billy-company",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/The-Billy-Company/zoning.git",
+    "directory": "editors/vscode"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "architecture",
+    "cursor",
+    "imports",
+    "language server",
+    "zoning"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:zoning",
+    "onCommand:zoning.setup",
+    "onCommand:zoning.status"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "zoning",
+        "aliases": [
+          "Zoning",
+          "zone"
+        ],
+        "extensions": [
+          ".zone"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/zoning-light.svg",
+          "dark": "./icons/zoning-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "zoning",
+        "scopeName": "source.zoning",
+        "path": "./syntaxes/zoning.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "zoning.setup",
+        "title": "Zoning: Set Up Editor Integrations",
+        "category": "Zoning"
+      },
+      {
+        "command": "zoning.status",
+        "title": "Zoning: Show Status",
+        "category": "Zoning"
+      }
+    ],
+    "configuration": {
+      "title": "Zoning",
+      "properties": {
+        "zoning.executablePath": {
+          "type": "string",
+          "default": "zoning",
+          "scope": "machine-overridable",
+          "description": "Path or command name for the separately installed zoning executable."
+        },
+        "zoning.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "scope": "window",
+          "description": "Trace communication between the editor and zoning language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "node ./scripts/clean.mjs",
+    "build": "node ./scripts/build.mjs",
+    "check": "tsc --noEmit && node ./scripts/validate.mjs",
+    "test": "npm run check && npm run build && node --test ./tests/*.test.mjs",
+    "package": "npm run clean && npm run test && vsce package --no-dependencies --out ./artifacts/raw.vsix && python3 ./scripts/deterministic.py ./artifacts/raw.vsix ../../crates/zoning/src/setup/payload/zoning.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.6.2",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

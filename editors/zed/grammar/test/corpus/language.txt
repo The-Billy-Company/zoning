@@ -1,0 +1,69 @@
+==================
+Complete contract
+==================
+
+package layered {
+  root src
+  language zig
+  facade root.zig
+  exclude generated/**
+}
+
+zones {
+  floor floor.zig
+  engine {
+    engine/**
+    shared/**
+  }
+  face face.zig
+}
+
+seal engine through engine.zig open to face.zig
+keep face.zig to root.zig
+use irregex gist by engine face
+limit reach to 2 hops
+forbid cycles across directories
+variance seal face.zig -> engine/parts.zig because "retire through the facade"
+
+---
+
+(source_file
+  (package_declaration
+    name: (word)
+    (package_setting value: (word))
+    (package_setting value: (word))
+    (package_setting value: (paths (word)))
+    (package_setting value: (paths (word))))
+  (zones_declaration
+    (zone_definition name: (word) paths: (paths (word)))
+    (zone_definition name: (word) paths: (paths (path_block (word) (word))))
+    (zone_definition name: (word) paths: (paths (word))))
+  (seal_declaration subject: (word) facade: (word) guests: (paths (word)))
+  (keep_declaration subject: (word) guests: (paths (word)))
+  (use_declaration modules: (paths (word) (word)) scope: (paths (word) (word)))
+  (limit_declaration count: (number))
+  (forbid_declaration)
+  (variance_declaration
+    law: (law)
+    subject: (edge from: (word) to: (word))
+    reason: (string)))
+
+==================
+Folded cycle reason
+==================
+
+variance cycle {
+  one.zig
+  two.zig
+}
+because
+  \\Retire this once the common interface lands.
+  \\The second line folds into the same reason.
+
+---
+
+(source_file
+  (variance_declaration
+    law: (law)
+    subject: (cycle member: (word) member: (word))
+    reason: (folded_reason (reason_text) (reason_text))))

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-labelledby="title">
+  <title id="title">Zoning protected contour core concept</title>
+  <g id="mark" fill="currentColor" fill-rule="evenodd">
+    <path d="M4 1h8l3 3v8l-3 3H4l-3-3V4l3-3zm1 2h6l2 2v6l-2 2H5l-2-2V5l2-2z"/>
+    <path d="M6 5h4l2 2v3l-2 2H6l-2-2V7l2-2zm1 2h2l1 1v1l-1 1H7L6 9V8l1-1z"/>
+    <path d="M7 7h2l1 1v1l-1 1H7L6 9V8l1-1z"/>
+  </g>
+</svg>

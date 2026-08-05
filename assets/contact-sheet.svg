@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     viewBox="0 0 720 420" width="720" height="420" role="img"
+     aria-labelledby="title description">
+  <title id="title">Zoning identity concept contact sheet</title>
+  <desc id="description">Three pixel-grid concepts rendered at 16, 24, and 32 pixels on light and dark backgrounds.</desc>
+
+  <rect width="360" height="420" fill="#f3f5f7"/>
+  <rect x="360" width="360" height="420" fill="#16191d"/>
+  <g font-family="ui-monospace, monospace" font-size="12" font-weight="600" letter-spacing=".8">
+    <text x="28" y="32" fill="#16191d">LIGHT</text>
+    <text x="388" y="32" fill="#f3f5f7">DARK</text>
+  </g>
+
+  <g font-family="ui-monospace, monospace" font-size="11">
+    <g fill="#535b66">
+      <text x="28" y="80">STACKED PARCELS - SELECTED</text>
+      <text x="28" y="194">SEALED DOORWAY</text>
+      <text x="28" y="308">PROTECTED CONTOUR CORE</text>
+    </g>
+    <g fill="#aeb6c0">
+      <text x="388" y="80">STACKED PARCELS - SELECTED</text>
+      <text x="388" y="194">SEALED DOORWAY</text>
+      <text x="388" y="308">PROTECTED CONTOUR CORE</text>
+    </g>
+  </g>
+
+  <g color="#16191d">
+    <use xlink:href="concepts/stacked-parcels.svg#mark" x="30" y="100" width="16" height="16"/>
+    <use xlink:href="concepts/stacked-parcels.svg#mark" x="90" y="96" width="24" height="24"/>
+    <use xlink:href="concepts/stacked-parcels.svg#mark" x="158" y="92" width="32" height="32"/>
+    <use xlink:href="concepts/sealed-doorway.svg#mark" x="30" y="214" width="16" height="16"/>
+    <use xlink:href="concepts/sealed-doorway.svg#mark" x="90" y="210" width="24" height="24"/>
+    <use xlink:href="concepts/sealed-doorway.svg#mark" x="158" y="206" width="32" height="32"/>
+    <use xlink:href="concepts/protected-contour.svg#mark" x="30" y="328" width="16" height="16"/>
+    <use xlink:href="concepts/protected-contour.svg#mark" x="90" y="324" width="24" height="24"/>
+    <use xlink:href="concepts/protected-contour.svg#mark" x="158" y="320" width="32" height="32"/>
+  </g>
+  <g color="#f3f5f7">
+    <use xlink:href="concepts/stacked-parcels.svg#mark" x="390" y="100" width="16" height="16"/>
+    <use xlink:href="concepts/stacked-parcels.svg#mark" x="450" y="96" width="24" height="24"/>
+    <use xlink:href="concepts/stacked-parcels.svg#mark" x="518" y="92" width="32" height="32"/>
+    <use xlink:href="concepts/sealed-doorway.svg#mark" x="390" y="214" width="16" height="16"/>
+    <use xlink:href="concepts/sealed-doorway.svg#mark" x="450" y="210" width="24" height="24"/>
+    <use xlink:href="concepts/sealed-doorway.svg#mark" x="518" y="206" width="32" height="32"/>
+    <use xlink:href="concepts/protected-contour.svg#mark" x="390" y="328" width="16" height="16"/>
+    <use xlink:href="concepts/protected-contour.svg#mark" x="450" y="324" width="24" height="24"/>
+    <use xlink:href="concepts/protected-contour.svg#mark" x="518" y="320" width="32" height="32"/>
+  </g>
+
+  <g font-family="ui-monospace, monospace" font-size="10">
+    <g fill="#69727e">
+      <text x="28" y="140">16</text><text x="91" y="140">24</text><text x="163" y="140">32</text>
+      <text x="28" y="254">16</text><text x="91" y="254">24</text><text x="163" y="254">32</text>
+      <text x="28" y="368">16</text><text x="91" y="368">24</text><text x="163" y="368">32</text>
+    </g>
+    <g fill="#939da8">
+      <text x="388" y="140">16</text><text x="451" y="140">24</text><text x="523" y="140">32</text>
+      <text x="388" y="254">16</text><text x="451" y="254">24</text><text x="523" y="254">32</text>
+      <text x="388" y="368">16</text><text x="451" y="368">24</text><text x="523" y="368">32</text>
+    </g>
+  </g>
+</svg>

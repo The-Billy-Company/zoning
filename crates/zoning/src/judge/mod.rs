@@ -49,6 +49,10 @@ pub struct Finding {
     pub path: String,
     /// 1-based line.
     pub line: usize,
+    /// 1-based character column.
+    pub col: usize,
+    /// Character width to underline.
+    pub width: usize,
     /// What went wrong, and why it matters.
     pub message: String,
     /// The exact string a `variance` must name to ratify this.
@@ -140,8 +144,16 @@ struct Bench<'a> {
 impl Bench<'_> {
     /// Record a violation, routing it through any variance that ratifies it.
     fn record(&mut self, law: Law, path: &str, line: usize, message: String, subject: String) {
-        let finding =
-            Finding { law, path: self.survey.rel(path), line, message, subject: subject.clone() };
+        let (col, width) = self.survey.span_at(path, line);
+        let finding = Finding {
+            law,
+            path: self.survey.rel(path),
+            line,
+            col,
+            width,
+            message,
+            subject: subject.clone(),
+        };
         match self.ordinance.variance(law, &subject) {
             Some(variance) => {
                 self.used.insert((law, subject));
@@ -157,6 +169,14 @@ impl Bench<'_> {
     /// the law — it is the law having nothing to say. Ratifying that would ratify
     /// the hole rather than the crossing.
     fn unwaivable(&mut self, law: Law, path: &str, message: String, subject: String) {
-        self.findings.push(Finding { law, path: self.survey.rel(path), line: 1, message, subject });
+        self.findings.push(Finding {
+            law,
+            path: self.survey.rel(path),
+            line: 1,
+            col: 1,
+            width: 1,
+            message,
+            subject,
+        });
     }
 }

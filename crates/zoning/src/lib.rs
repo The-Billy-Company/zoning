@@ -75,9 +75,11 @@
 
 pub mod draft;
 pub mod judge;
+pub mod lsp;
 pub mod ordinance;
 pub mod pattern;
 pub mod report;
+pub mod setup;
 pub mod survey;
 
 use std::path::{Path, PathBuf};

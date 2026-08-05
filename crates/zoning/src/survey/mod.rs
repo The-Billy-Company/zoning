@@ -35,6 +35,10 @@ pub struct Edge {
     pub dst: String,
     /// 1-based line of the import statement in `src`.
     pub line: usize,
+    /// 1-based character column of the import statement.
+    pub col: usize,
+    /// Character width of the import head.
+    pub width: usize,
     /// How many directories the written spec climbs.
     pub hops: u32,
     /// The literal as written.
@@ -63,6 +67,10 @@ pub struct Departure {
     pub spec: String,
     /// 1-based line of the import statement.
     pub line: usize,
+    /// 1-based character column of the import statement.
+    pub col: usize,
+    /// Character width of the import head.
+    pub width: usize,
 }
 
 impl Departure {
@@ -148,12 +156,30 @@ impl Survey {
             let lines = Lines::of(&raw);
             for import in ask.dialect.imports(&raw, &code) {
                 let line = lines.at(import.offset);
+                let col = column(&raw, import.offset);
+                let width = raw[import.offset..]
+                    .chars()
+                    .take_while(|character| !character.is_whitespace() && *character != '(')
+                    .count()
+                    .max(1);
                 if !ask.dialect.is_local(&import.spec) {
-                    outside.push(Departure { src: src.clone(), spec: import.spec, line });
+                    outside.push(Departure {
+                        src: src.clone(),
+                        spec: import.spec,
+                        line,
+                        col,
+                        width,
+                    });
                     continue;
                 }
                 let Some(dst) = resolve(src, &import.spec) else {
-                    escapes.push(Departure { src: src.clone(), spec: import.spec, line });
+                    escapes.push(Departure {
+                        src: src.clone(),
+                        spec: import.spec,
+                        line,
+                        col,
+                        width,
+                    });
                     continue;
                 };
                 if !judged.contains(dst.as_str()) {
@@ -165,6 +191,8 @@ impl Survey {
                     src: src.clone(),
                     dst,
                     line,
+                    col,
+                    width,
                     spec: import.spec,
                 });
             }
@@ -232,6 +260,31 @@ impl Survey {
         }
         out
     }
+
+    /// Best source span for a finding reported at `path:line`.
+    #[must_use]
+    pub fn span_at(&self, path: &str, line: usize) -> (usize, usize) {
+        self.edges
+            .iter()
+            .map(|edge| (&edge.src, edge.line, edge.col, edge.width))
+            .chain(
+                self.escapes
+                    .iter()
+                    .chain(&self.outside)
+                    .map(|edge| (&edge.src, edge.line, edge.col, edge.width)),
+            )
+            .find(|(source, edge_line, _, _)| source == &path && *edge_line == line)
+            .map_or((1, 1), |(_, _, col, width)| (col, width))
+    }
+}
+
+fn column(source: &str, offset: usize) -> usize {
+    source[..offset.min(source.len())]
+        .rsplit_once('\n')
+        .map_or(source[..offset.min(source.len())].chars().count(), |(_, tail)| {
+            tail.chars().count()
+        })
+        + 1
 }
 
 /// Collapse `dir(src) / spec` lexically. `None` when it climbs out of the module.

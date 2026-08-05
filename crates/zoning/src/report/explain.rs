@@ -209,7 +209,7 @@ fn spelled(from: &str, to: &str) -> Edge {
     let depth = if here == "." { 0 } else { here.split('/').count() };
     let hops = u32::try_from(depth.saturating_sub(shared)).unwrap_or(u32::MAX);
     let spec = format!("{}{to}", "../".repeat(hops as usize));
-    Edge { src: from.to_owned(), dst: to.to_owned(), line: 0, hops, spec }
+    Edge { src: from.to_owned(), dst: to.to_owned(), line: 0, col: 1, width: 1, hops, spec }
 }
 
 /// Up to three of a list, for a line that has to stay one line.
