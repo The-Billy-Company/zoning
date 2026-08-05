@@ -6,6 +6,73 @@ workspace's `Cargo.toml`.
 
 <!-- towncrier release notes start -->
 
+## [1.1.0] - 2026-08-05
+
+### Added
+
+- A property and fuzz suite, with no test framework behind it. The fixtures prove each law
+  fires on the tree built to break it, which is the right test for a law and the wrong one
+  for a claim about *every* graph - and it was a claim about every graph that was false. So
+  there are now five properties over generated packages: a drafted contract is true of the
+  graph it came from, a tangle is never drafted into silence, the cycle law finds what a
+  slower O(n^3) reachability oracle finds, a verdict does not move when the walk order is
+  stirred, and no finding exists that no file's `explain` can show. Plus four fuzz targets
+  over the two places bytes arrive from outside - a hand-written contract and a source tree -
+  because a gate that panics is indistinguishable from a broken build and sends its reader
+  looking in the wrong repository.
+
+  There is no `proptest` here for the same reason there are no dependencies anywhere else: a
+  gate that runs in everyone's CI should be a static binary you can audit in an afternoon.
+  What a property test actually needs is a generator, a deterministic seed, and invariants
+  worth asserting, and none of that requires a framework. `ZONING_SEED` replays a failure
+  exactly and `ZONING_CASES` turns the same code into a soak, which a scheduled job now runs
+  at fifty times the per-commit case count with a fresh seed each time, so the search keeps
+  covering ground the last run did not.
+
+  The oracle is the part worth stealing. It shares no code with the law it checks: transitive
+  closure by relaxation to a fixed point, then mutual reachability as the equivalence
+  relation. Far too slow to ship, which is exactly what makes it a trustworthy second
+  opinion, and it disagreed with Tarjan on the thirteenth generated package.
+- `.zone` is now a first-class editor language: one installed `zoning` executable
+  ships the LSP, a crisp SVG identity, safe first-run setup, and adapters for
+  Cursor, VS Code, Zed, Neovim, and Vim.
+
+### Fixed
+
+- The `setup` fake-HOME test named its scratch directory after the current
+  test-thread name to keep parallel runs from colliding, and Rust spells that
+  name `setup::tests::fake_home_install_repair_and_uninstall_are_owned` - a
+  path segment with three colons in it. Unix shrugs; Windows refuses to open a
+  directory whose name isn't a legal filename, so every `cargo test --release`
+  on `windows-latest` failed before the real assertions even ran. The thread
+  name is now sanitized (`:` -> `_`) before it becomes a path component, which
+  still keeps concurrent test runs apart without asking Windows to accept a
+  volume-label character in the middle of a directory name.
+- The cycle law was blind to most real cycles, and a property test found it in about a
+  second. `forbid cycles across directories` withheld same-directory imports from the graph
+  *before* searching it, which severs any tangle whose trip home goes through a neighbour:
+  `a/one.zig -> a/two.zig -> b/three.zig -> a/one.zig` binds `a` and `b` into one
+  indivisible unit exactly as tightly as a two-file cycle does, and zoning reported nothing.
+  Crossing a boundary is a property of the cycle, not of the individual imports in it, so
+  the filter moved off the edges and onto the component: search the whole graph, then keep
+  the components that bind more than one module. A cycle wholly inside a directory - or
+  inside a directory and the door file named for it - is still that module's own business.
+
+  `draft` had been contradicting itself in one breath because of this. It would merge two
+  directories into a single zone with the note "these 2 directories import each other, so no
+  order separates them", then close with "Nothing else to declare: this graph is already a
+  stack". The zone stack reads the directory graph and saw the tangle; the tangle detector
+  dropped the edge that proved it. Now a draft over a graph with a real cycle emits the
+  variance stanza with an empty reason, which does not parse, which is the whole point.
+
+  Adopting this is not free, and it should not be: it turns previously-silent tangles into
+  findings. In our own trees it surfaced five in a 310-file package - two nobody knew about,
+  and three that existing variances had described with too few members - and one in another.
+  Every one of them was real before this release; the tool simply could not see it. A
+  variance whose member list is now short fails as stale rather than passing quietly, so the
+  contract gets corrected rather than left subtly wrong.
+
+
 ## [1.0.0] - 2026-08-04
 
 ### Added
