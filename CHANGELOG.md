@@ -6,6 +6,61 @@ workspace's `Cargo.toml`.
 
 <!-- towncrier release notes start -->
 
+## [1.2.0] - 2026-08-05
+
+### Added
+
+- The crate is `zoning` and always will be — that's the thing you `cargo install`
+  or `pip install` — but nobody wants to type six syllables before every `verify`.
+  `zone` is now installed alongside it, from the same source, as the second
+  `[[bin]]` target of the identical binary: `cargo install zoning`, `pipx install
+  zoning`, and `uv tool install zoning` all put both `zone` and `zoning` on
+  `PATH`, and either name runs the same executable byte-for-byte apart from its
+  own filename.
+
+  `zone` is the one the docs teach now — `--help`, `--version`, every error
+  message, and the `zone map`/`zone [package]:` report headers all say `zone`
+  regardless of which name launched them, the way `rg --version` says `rg` and
+  not `ripgrep`. `zoning` keeps working exactly as before for anyone whose
+  fingers, scripts, or CI YAML already know it; nothing that names `zoning`
+  today needs to change.
+- The first parity pass copied what every sibling repo already had; this one catches what zoning
+  needed that they didn't, because zoning is the only one of the five that is 100% Rust rather than
+  Rust bindings over a Zig core. `deny.toml` plus a `cargo deny check` step in the `check` job close
+  a real gap the siblings did not have either — this crate carries four real dependencies now
+  (`lsp-server`, `lsp-types`, `serde`, `serde_json`) for the in-process LSP server, and nothing was
+  watching that graph for a RustSec advisory, a license outside policy, or TLS/async-runtime crates
+  that transport has no reason to link. `rust-toolchain.toml` resolves `rustfmt`, `clippy`, and the
+  `wasm32-wasip1` target `editors/zed` needs for a bare-rustup contributor with no mise — pinned to
+  `stable` rather than a fixed release like the siblings' copy of this file, because every job in
+  `ci.yml` installs its toolchain with `dtolnay/rust-toolchain@stable`, and a fixed-version pin would
+  have silently frozen every one of those rolling jobs to whatever release was current the day the
+  file was written. `.vscode/{settings,extensions,tasks}.json` gives a contributor the same
+  watcher/search excludes, formatter bindings, and one-click cargo/dogfood/deny/editor tasks the
+  siblings ship, adapted off Rust rather than Zig as the primary language.
+- zoning shipped without the governance and hygiene layer its sibling repos (`gist`, `relate`,
+  `blast`, `irregex`) already carry: no `CODE_OF_CONDUCT.md`, `SECURITY.md`, or
+  `CONTRIBUTING.md`, no issue or pull-request templates or `CODEOWNERS`, no
+  `labels.json`/`triage.py` triage automation, and no `.typos.toml` / `.taplo.toml` /
+  `.yamllint` / `.editorconfig-checker.json` / `.mise.toml` to hold the parts of the tree that
+  aren't Rust to the same bar as the parts that are. Filing against this repo meant a
+  different experience than filing against a sibling for no reason but that nobody had
+  written the second one down yet.
+
+  All of it is written now, specific to what zoning actually is rather than copied verbatim.
+  `SECURITY.md`'s threat model covers a false verdict, glob semantics silently diverging from
+  the CPython contract they're specified against, and the in-process LSP server this crate now
+  ships (`zoning lsp --stdio`) - not a generic supply-chain section a zero-dependency crate has
+  no surface to justify. `labels.json` carries zoning's own `area/*` taxonomy (`cli`, `lsp`,
+  `contract`, `editors`, `ci`, `docs`, `build`) mapped onto its real module tree, alongside the
+  `size/*`/`status/*`/`type/*` rows kept byte-identical with every sibling so `triage.py peers`
+  still holds across all of them. A new `discipline` CI job runs markdownlint, typos,
+  yamllint, taplo, editorconfig-checker, ruff, and shellcheck over everything `cargo test`
+  never touches, and it is a `release-ready` dependency exactly like `check` or `dogfood` - a
+  tag can no longer ship with a broken paper trail any more than it can ship with a failing
+  test.
+
+
 ## [1.1.0] - 2026-08-05
 
 ### Added
