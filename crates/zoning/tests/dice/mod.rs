@@ -68,12 +68,18 @@ pub(crate) struct Grown {
     pub(crate) files: Vec<String>,
     /// Importer → imported, as indices into [`Grown::files`].
     pub(crate) edges: Vec<(usize, usize)>,
+    /// Every import naming a module outside the package: (importer index, module).
+    pub(crate) outsiders: Vec<(usize, &'static str)>,
 }
 
 /// Directory names, chosen to be legal zone names so a draft can name them.
 const HOUSES: [&str; 6] = ["kernel", "surface", "exec", "corpus", "folio", "press"];
 /// File stems, likewise.
 const ROOMS: [&str; 6] = ["core", "fold", "span", "tally", "weave", "glean"];
+/// Outside module names a grown file may reach for. Few on purpose: the `use`-law
+/// properties want every one of them either granted or refused, not a vocabulary wide
+/// enough to make that bookkeeping the point.
+pub(crate) const STRANGERS: [&str; 4] = ["acme", "flux", "orbit", "quark"];
 
 /// Grow a package under `at`, and write it to disk.
 ///
@@ -114,6 +120,18 @@ pub(crate) fn grow(d: &mut Dice, at: &Path, tangled: bool) -> Grown {
     edges.sort_unstable();
     edges.dedup();
 
+    // Every file, the facade included, may also reach outside the package — the
+    // facade case is the one `draft` got wrong (a grant it cannot scope to anything),
+    // so it is not special-cased away here.
+    let mut outsiders: Vec<(usize, &'static str)> = Vec::new();
+    for from in 0..files.len() {
+        for _ in 0..d.between(0, 2) {
+            outsiders.push((from, STRANGERS[d.below(STRANGERS.len())]));
+        }
+    }
+    outsiders.sort_unstable();
+    outsiders.dedup();
+
     for (index, rel) in files.iter().enumerate() {
         let path = module.join(rel);
         std::fs::create_dir_all(path.parent().expect("a file has a parent")).expect("mkdir");
@@ -121,11 +139,14 @@ pub(crate) fn grow(d: &mut Dice, at: &Path, tangled: bool) -> Grown {
         for (alias, (_, to)) in edges.iter().filter(|(from, _)| *from == index).enumerate() {
             let _ = writeln!(text, "const p{alias} = @import(\"{}\");", spec(rel, &files[*to]));
         }
+        for (alias, (_, module_name)) in outsiders.iter().filter(|(from, _)| *from == index).enumerate() {
+            let _ = writeln!(text, "const o{alias} = @import(\"{module_name}\");");
+        }
         text.push_str("pub const value: usize = 1;\n");
         std::fs::write(&path, text).expect("write a generated file");
     }
 
-    Grown { root: at.to_path_buf(), files, edges }
+    Grown { root: at.to_path_buf(), files, edges, outsiders }
 }
 
 /// How `from` spells an import of `to`, both module-relative.

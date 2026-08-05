@@ -6,12 +6,19 @@
 //! algorithm finds, that a verdict does not depend on the order a directory happened to
 //! be walked in. Each property below generates its own packages from a seed and prints
 //! that seed when it fails, so a red run is reproducible with `ZONING_SEED=…`.
+//!
+//! `use` is one law short of the parity story the other six get: it postdates the Rust
+//! rewrite, so `tools/differential.py` has no Python implementation to check it against
+//! (see that file, and the README's Build and Test section). [`the_use_law_flags_exactly_the_outside_imports_no_grant_covers`]
+//! is this law's stand-in — an independent oracle, the same role `knots` plays for
+//! `cycle`, run at the scale a hand-written fixture cannot reach.
 
 #![allow(clippy::expect_used, reason = "a test that cannot build its fixture has failed")]
 
 mod dice;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+use std::fmt::Write as _;
 
 use dice::Dice;
 use zoning::judge::{self, dir_of};
@@ -190,6 +197,134 @@ fn the_cycle_law_finds_what_a_slower_algorithm_finds() {
         let oracle = knots(&survey);
         (law != oracle).then(|| format!("the law says {law:?}, the oracle says {oracle:?}"))
     });
+}
+
+#[test]
+fn the_use_law_flags_exactly_the_outside_imports_no_grant_covers() {
+    // `use` postdates the Rust rewrite (see `tools/differential.py` and the README), so
+    // it is the one law with no second implementation to check it against. This is its
+    // stand-in: an oracle that never calls `Ordinance::grant`/`may_use`, built instead
+    // from the same raw (importer, module, policy) facts the law itself starts from —
+    // proving both directions (a refused import, an unspent grant) at once, and at a
+    // scale the two hand-built fixtures next door were never meant to reach.
+    let scratch = dice::scratch("use-oracle");
+    let mut broken = Vec::new();
+    for index in 0..dice::cases(200) {
+        let seed = dice::seed() ^ (index as u64).wrapping_mul(0x2545_F491_4F6C_DD1D);
+        let mut rolls = Dice::new(seed);
+        let here = scratch.join(format!("case-{index}"));
+        let grown = dice::grow(&mut rolls, &here, false);
+        if let Some(why) = use_case(&mut rolls, &grown) {
+            broken.push(format!("  ZONING_SEED={seed} — {why}"));
+        }
+        let _ = std::fs::remove_dir_all(&here);
+    }
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert!(broken.is_empty(), "{} case(s) failed:\n{}", broken.len(), broken.join("\n"));
+}
+
+/// One `use`-oracle case: draft a random grant table over `grown`'s real outside
+/// imports — some modules ungranted, some unscoped, some scoped to a random subset of
+/// the houses — then judge it and check the verdict against a hand-computed answer.
+fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
+    if grown.outsiders.is_empty() {
+        return None; // nothing this law could say anything about
+    }
+    let mut houses: Vec<&str> = grown.files[1..].iter().map(|f| dir_of(f)).collect();
+    houses.sort_unstable();
+    houses.dedup();
+
+    let mut modules: Vec<&str> = grown.outsiders.iter().map(|(_, m)| *m).collect();
+    modules.sort_unstable();
+    modules.dedup();
+
+    // One policy per module, decided independently of the law under test: no grant at
+    // all (every occurrence must be refused), an unscoped grant (every occurrence is
+    // covered), or a grant scoped to a random non-empty subset of the houses — chosen
+    // without regard to which houses actually import the module, so an empty-coverage
+    // scoped grant (a stale one) is just as likely as a useful one.
+    let mut granted: HashMap<&str, Option<Vec<&str>>> = HashMap::new();
+    let mut lines = String::new();
+    for &module in &modules {
+        match rolls.below(3) {
+            0 => {}
+            1 => {
+                granted.insert(module, None);
+                let _ = writeln!(lines, "use {module}");
+            }
+            _ => {
+                let mut scope: Vec<&str> =
+                    houses.iter().copied().filter(|_| rolls.odds(2)).collect();
+                if scope.is_empty() {
+                    scope.push(houses[rolls.below(houses.len())]);
+                }
+                let _ = writeln!(lines, "use {module} by {}", scope.join(" "));
+                granted.insert(module, Some(scope));
+            }
+        }
+    }
+
+    let mut zones = String::new();
+    for house in &houses {
+        let _ = writeln!(zones, "    {house}  {house}/**");
+    }
+    let text = format!(
+        "package grown {{\n\
+         \x20   root     src\n\
+         \x20   language zig\n\
+         \x20   facade   root.zig\n\
+         }}\n\n\
+         zones {{\n{zones}}}\n\n\
+         {lines}\n\
+         forbid cycles across directories\n"
+    );
+    let path = dice::file(&grown.root, "grown", &text);
+    let ordinance = match Ordinance::read(&path, zig()) {
+        Ok(ordinance) => ordinance,
+        Err(fault) => return Some(format!("a use-oracle contract must parse:\n{fault}\n{text}")),
+    };
+    let survey = Survey::of(&Ask {
+        repo_root: &grown.root,
+        module_root: &ordinance.module_root,
+        exclude: &ordinance.exclude,
+        dialect: ordinance.dialect,
+        tracked: None,
+    });
+    let found = judge::judge(&survey, &ordinance);
+
+    // The oracle: for every outside import the generator actually wrote, whether the
+    // policy above covers it — no glob engine, no `Ordinance` lookup, just the plain
+    // membership test the policy is defined by.
+    let mut want: BTreeSet<String> = BTreeSet::new();
+    let mut touched: BTreeSet<&str> = BTreeSet::new();
+    for &(from, module) in &grown.outsiders {
+        let zone: Option<&str> = (from != 0).then(|| dir_of(&grown.files[from]));
+        let covered = match granted.get(module) {
+            None => false,
+            Some(None) => true,
+            Some(Some(scope)) => zone.is_some_and(|z| scope.contains(&z)),
+        };
+        if covered {
+            touched.insert(module);
+        } else {
+            want.insert(format!("{} -> {module}", zone.unwrap_or("facade")));
+        }
+    }
+    let stale_want: BTreeSet<&str> =
+        granted.keys().copied().filter(|m| !touched.contains(m)).collect();
+
+    let got: BTreeSet<String> =
+        found.findings.iter().filter(|f| f.law == Law::Use).map(|f| f.subject.clone()).collect();
+    if got != want {
+        return Some(format!("the law says {got:?}, the oracle says {want:?}\n{text}"));
+    }
+    let stale_got: BTreeSet<&str> = found
+        .stale
+        .iter()
+        .filter_map(|s| s.strip_prefix("use ")?.split_whitespace().next())
+        .collect();
+    (stale_got != stale_want)
+        .then(|| format!("stale says {stale_got:?}, the oracle says {stale_want:?}\n{text}"))
 }
 
 #[test]
