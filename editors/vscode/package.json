@@ -2,7 +2,7 @@
   "name": "zoning",
   "displayName": "Zoning",
   "description": "Architecture contracts and language intelligence for .zone files.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "the-billy-company",
   "license": "Apache-2.0",
   "repository": {

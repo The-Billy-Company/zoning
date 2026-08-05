@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/zoning"]
 
 [workspace.package]
-version = "1.0.0"                                                                 # x-release-please-version
+version = "1.1.0"                                                                 # x-release-please-version
 edition = "2024"
 # 1.88 is where `let` chains stabilized. Three of them read better than the
 # nested `if`s they replace, and a floor a year old is not a barrier for a
