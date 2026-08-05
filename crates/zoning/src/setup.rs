@@ -411,10 +411,11 @@ mod tests {
 
     #[test]
     fn fake_home_install_repair_and_uninstall_are_owned() -> Result<()> {
+        let thread_name = std::thread::current().name().unwrap_or("test").replace(':', "_");
         let home = std::env::temp_dir().join(format!(
             "zoning-setup-{}-{}",
             std::process::id(),
-            std::thread::current().name().unwrap_or("test")
+            thread_name
         ));
         if home.exists() {
             fs::remove_dir_all(&home)?;
