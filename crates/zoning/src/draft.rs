@@ -77,7 +77,11 @@ pub fn contract(survey: &Survey, package: &str, root: &str, nested: &[String]) -
     if !grants.is_empty() {
         out.push_str("\n// Outside modules, and who carries them.\n");
         for (module, scopes) in &grants {
-            let _ = writeln!(out, "use {module} by {}", scopes.join(" "));
+            if scopes.is_empty() {
+                let _ = writeln!(out, "use {module}");
+            } else {
+                let _ = writeln!(out, "use {module} by {}", scopes.join(" "));
+            }
         }
     }
 
@@ -268,21 +272,33 @@ fn name_for(dir: &str, package: &str, depth: usize) -> String {
 }
 
 /// Each non-ambient module, and the zones importing it.
+///
+/// A `None` match means the importer is the facade — it claims no zone by
+/// construction, so no scope could ever name it. One facade occurrence forces the
+/// whole grant unscoped: a scoped `use … by …` can widen to cover more zones, but
+/// it can never be made to reach a file that has none.
 fn grants(survey: &Survey, zones: &[(String, Vec<String>)]) -> Vec<(String, Vec<String>)> {
     let ambient = survey.dialect.ambient();
     let claims: Vec<(&str, Globs)> =
         zones.iter().map(|(name, globs)| (name.as_str(), Globs::new(globs))).collect();
-    let mut wanted: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut wanted: BTreeMap<&str, BTreeSet<Option<&str>>> = BTreeMap::new();
     for outside in &survey.outside {
         if ambient.contains(&outside.spec.as_str()) {
             continue;
         }
         let zone =
             claims.iter().find(|(_, globs)| globs.matches(&outside.src)).map(|(name, _)| *name);
-        wanted.entry(&outside.spec).or_default().extend(zone);
+        wanted.entry(&outside.spec).or_default().insert(zone);
     }
     wanted
         .into_iter()
-        .map(|(module, zones)| (module.to_owned(), zones.into_iter().map(str::to_owned).collect()))
+        .map(|(module, zones)| {
+            let scope = if zones.iter().all(Option::is_some) {
+                zones.into_iter().flatten().map(str::to_owned).collect()
+            } else {
+                Vec::new()
+            };
+            (module.to_owned(), scope)
+        })
         .collect()
 }
