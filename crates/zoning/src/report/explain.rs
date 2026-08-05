@@ -117,8 +117,8 @@ pub fn file(rel: &str, ordinance: &Ordinance, survey: &Survey, ink: &Ink) -> Ans
     let _ = writeln!(out, "  imported   {}{}", in_edges.len(), sample(&in_edges, |e| &e.src, ink));
 
     let verdict = judge::judge(survey, ordinance);
-    let mine: Vec<&judge::Finding> =
-        verdict.findings.iter().filter(|f| f.subject.starts_with(rel)).collect();
+    let here = survey.rel(rel);
+    let mine: Vec<&judge::Finding> = verdict.findings.iter().filter(|f| f.path == here).collect();
     let clean = mine.is_empty();
     if clean {
         let _ = writeln!(out, "  standing   {green}clean{reset}");
