@@ -176,3 +176,28 @@ jobs:
           git add ../../crates/zoning/src/setup/payload/zoning.vsix
           git commit -m "chore(editors): refresh the deterministic VS Code/Cursor payload"
           git push origin "HEAD:$BRANCH"
+
+      # release-please's `extra-files` regex-replaces the version string straight
+      # into Cargo.toml; it never runs cargo, so Cargo.lock's own pinned entry for
+      # the `zoning` package is left one version behind on every bump. Every
+      # `cargo … --locked` job downstream (fmt/clippy/test, the editor payload
+      # check, the MSRV floor) then refuses to proceed — `--locked` exists
+      # precisely to fail instead of silently rewriting a mismatched lockfile.
+      # `--precise` touches only that one pinned entry, not a full re-resolve.
+      - name: Re-pin Cargo.lock to the bumped version
+        env:
+          BRANCH: ${{ fromJson(needs.release-please.outputs.pr).headBranchName }}
+          RESULT: ${{ steps.version.outputs.result }}
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json,os; print(json.loads(os.environ["RESULT"])["version"])')
+          cargo update -p zoning --precise "$version"
+          if git diff --quiet HEAD -- Cargo.lock; then
+            echo "Cargo.lock already pinned to $version"
+            exit 0
+          fi
+          git config user.name 'billy-company-release[bot]'
+          git config user.email 'billy-company-release[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          git commit -m "chore: re-pin Cargo.lock to v$version"
+          git push origin "HEAD:$BRANCH"
