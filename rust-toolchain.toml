@@ -1,0 +1,16 @@
+# For contributors on bare rustup (no mise): resolves the components and the
+# `wasm32-wasip1` target `editors/zed` needs without a separate setup step.
+#
+# The channel is deliberately `stable`, not a pinned release like the sibling
+# repos' `rust-toolchain.toml` use for their Rust bindings crate. Every job in
+# `ci.yml` installs its toolchain with `dtolnay/rust-toolchain`, which runs
+# `rustup default <toolchain>` rather than `rustup override set` - and a
+# directory override outranks this file, but a bare default does not. Pinning
+# a fixed version here would win over that action's `stable` in every build,
+# clippy, and fmt step, silently turning a rolling gate into a frozen one.
+# `stable` resolves to the same toolchain either way, so this file only ever
+# adds components and a target; it never changes which compiler runs.
+[toolchain]
+channel = "stable"
+components = [ "rustfmt", "clippy" ]
+targets = [ "wasm32-wasip1" ]

@@ -1,0 +1,75 @@
+{
+  // These are the real contributor loop CONTRIBUTING.md asks for, not
+  // editor-only aliases that could disagree with what `ci.yml` runs.
+  "version": "2.0.0",
+  "presentation": {
+    "reveal": "always",
+    "panel": "dedicated",
+    "clear": true
+  },
+  "problemMatcher": [],
+  "tasks": [
+    {
+      "label": "cargo: check",
+      "type": "shell",
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "cargo: test",
+      "type": "shell",
+      "command": "cargo test --all-features",
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "cargo: test filtered",
+      "type": "shell",
+      "command": "cargo test --all-features -- ${input:testFilter}",
+      "group": "test"
+    },
+    {
+      "label": "cargo: fmt check",
+      "type": "shell",
+      "command": "cargo fmt --check",
+      "group": "test"
+    },
+    {
+      "label": "cargo: deny",
+      "type": "shell",
+      "command": "cargo deny check",
+      "group": "test"
+    },
+    {
+      // Mirrors ci.yml's `dogfood` job: every `tests/fixtures/pass` box
+      // verifies clean, every `tests/fixtures/fail` box does not. `--root`
+      // is required — with none given, zoning climbs to this repo's own
+      // worktree root instead of the fixture, and the loop would pass by
+      // finding nothing to judge.
+      "label": "zoning: dogfood fixtures",
+      "type": "shell",
+      "command": "cargo build --release && for b in tests/fixtures/pass/*/; do target/release/zoning verify --untracked --root \"$b\" || exit 1; done && for b in tests/fixtures/fail/*/; do target/release/zoning verify --untracked --root \"$b\" && { echo \"$b was expected to fail and did not\" >&2; exit 1; }; done; echo ok",
+      "group": "test"
+    },
+    {
+      "label": "editors: vscode package",
+      "type": "shell",
+      "command": "npm run package",
+      "options": { "cwd": "${workspaceFolder}/editors/vscode" },
+      "group": "build"
+    },
+    {
+      "label": "editors: zed grammar test",
+      "type": "shell",
+      "command": "npm test",
+      "options": { "cwd": "${workspaceFolder}/editors/zed/grammar" },
+      "group": "test"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "testFilter",
+      "type": "promptString",
+      "description": "Substring matched against Rust test names"
+    }
+  ]
+}

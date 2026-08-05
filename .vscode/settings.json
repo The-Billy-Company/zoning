@@ -1,0 +1,47 @@
+{
+  // Keep build output and dependency trees out of the watcher. `target/` is
+  // Cargo's, `dist/`/`artifacts/`/`node_modules/` belong to the two editor
+  // payloads, and the Python-driven discipline scripts get their own caches.
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/dist/**": true,
+    "**/artifacts/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/__pycache__/**": true,
+    "**/.ruff_cache/**": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "**/dist": true,
+    "**/artifacts": true,
+    "**/node_modules": true,
+    "**/.venv": true,
+    "**/__pycache__": true,
+    "**/.ruff_cache": true
+  },
+  "search.followSymlinks": false,
+
+  // .editorconfig owns indentation and line endings. Content guessing must not
+  // overrule the checked-in contract, and formatting stays an explicit action.
+  "editor.detectIndentation": false,
+  "editor.formatOnSave": false,
+  "files.eol": "\n",
+
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": false
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": false
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": false
+  }
+  // No entry for [typescript]/[javascript]: nothing in `discipline` or
+  // `editors` enforces a formatter over editors/vscode's TypeScript or
+  // editors/zed/grammar's tree-sitter grammar.js, so picking one here would
+  // be an opinion CI does not share.
+}

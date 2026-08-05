@@ -38,6 +38,14 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --all-features
       - run: cargo test --all-features
+      # deny.toml is a policy - a RustSec advisory against anything in the
+      # graph, the crates banned because the judge has no business linking
+      # TLS or an async runtime, the license allowlist, and where a crate may
+      # come from - not a snapshot of today's four dependencies.
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: cargo-deny@0.20.2
+      - run: cargo deny check
 
   # The tool judging itself. zoning's own tree is Rust, so there is no `.zone`
   # contract to check here yet; what this proves is that the binary runs, parses

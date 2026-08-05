@@ -1,0 +1,11 @@
+{
+  // One extension per language formatter this repository's discipline job
+  // enforces, plus the two repository-wide text contracts.
+  "recommendations": [
+    "charliermarsh.ruff",
+    "davidanson.vscode-markdownlint",
+    "editorconfig.editorconfig",
+    "rust-lang.rust-analyzer",
+    "tamasfe.even-better-toml"
+  ]
+}
