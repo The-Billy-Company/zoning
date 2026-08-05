@@ -3,7 +3,7 @@
 use lsp_server::{Connection, Message, Notification, Request, RequestId};
 use serde_json::json;
 
-type Server = std::thread::JoinHandle<Result<(), String>>;
+type Server = std::thread::JoinHandle<zoning::Result<()>>;
 
 fn initialized() -> Result<(Connection, Server), String> {
     let (server, client) = Connection::memory();
@@ -40,7 +40,10 @@ fn stop(client: &Connection, thread: Server) -> Result<(), String> {
         .sender
         .send(Notification::new("exit".to_owned(), json!(null)).into())
         .map_err(|error| error.to_string())?;
-    thread.join().map_err(|_| "server thread panicked".to_owned())??;
+    thread
+        .join()
+        .map_err(|_| "server thread panicked".to_owned())?
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 

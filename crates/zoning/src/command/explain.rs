@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use zoning::ordinance::{self, Ordinance};
 use zoning::report;
 use zoning::survey::{Ask, Survey};
+use zoning::Result;
 
 use super::Tracked;
 use super::args::Options;
@@ -19,18 +20,22 @@ pub(super) fn explain(
     options: &Options,
     root: &Path,
     tracked: &mut Tracked<'_>,
-) -> Result<ExitCode, String> {
+) -> Result<ExitCode> {
     let here =
         std::env::current_dir().map_err(|e| format!("cannot read the current directory: {e}"))?;
     let wanted: Vec<PathBuf> = options
         .args
         .iter()
-        .map(|arg| here.join(arg).canonicalize().map_err(|_| format!("no such file: `{arg}`")))
-        .collect::<Result<_, _>>()?;
+        .map(|arg| {
+            here.join(arg)
+                .canonicalize()
+                .map_err(|_| format!("no such file: `{arg}`").into())
+        })
+        .collect::<Result<_>>()?;
 
     let mut best: Option<Ordinance> = None;
     for path in ordinance::discover(root, &options.under) {
-        let contract = Ordinance::read(&path, options.language).map_err(|f| f.to_string())?;
+        let contract = Ordinance::read(&path, options.language)?;
         let holds = wanted.iter().all(|w| w.starts_with(&contract.module_root));
         let deeper =
             best.as_ref().is_none_or(|prior| contract.module_root.starts_with(&prior.module_root));
@@ -43,7 +48,8 @@ pub(super) fn explain(
             "no governed package holds {} — `zoning list` shows what is governed, and \
              `zoning draft <dir>` starts a contract for what is not",
             options.args.iter().map(|a| format!("`{a}`")).collect::<Vec<_>>().join(" and ")
-        ));
+        )
+        .into());
     };
 
     let found = Survey::of(&Ask {
@@ -53,15 +59,13 @@ pub(super) fn explain(
         dialect: contract.dialect,
         tracked: tracked.of(contract.dialect),
     });
-    let named: Vec<String> = wanted
-        .iter()
-        .map(|path| judged(path, &contract, &found, tracked))
-        .collect::<Result<_, _>>()?;
+    let named: Vec<String> =
+        wanted.iter().map(|path| judged(path, &contract, &found, tracked)).collect::<Result<_>>()?;
 
     let answer = match named.as_slice() {
         [one] => report::file(one, &contract, &found, &options.ink),
         [from, to] => report::edge(from, to, &contract, &found, &options.ink),
-        _ => return Err("`explain` takes one file, or two".to_owned()),
+        _ => return Err("`explain` takes one file, or two".into()),
     };
     print!("{}", answer.text);
     let _ = std::io::stdout().flush();
@@ -82,7 +86,7 @@ fn judged(
     contract: &Ordinance,
     found: &Survey,
     tracked: &mut Tracked<'_>,
-) -> Result<String, String> {
+) -> Result<String> {
     let rel = path
         .strip_prefix(&contract.module_root)
         .map_err(|_| format!("{} is outside {}", path.display(), contract.module_root.display()))?
@@ -101,5 +105,5 @@ fn judged(
     } else {
         "it is not in the judged set".to_owned()
     };
-    Err(format!("{} holds `{rel}` but does not judge it: {why}", contract.package))
+    Err(format!("{} holds `{rel}` but does not judge it: {why}", contract.package).into())
 }

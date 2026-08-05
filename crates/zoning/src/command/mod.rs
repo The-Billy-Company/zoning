@@ -16,6 +16,7 @@ use zoning::judge::{self, Verdict};
 use zoning::ordinance::{self, Fault, Ordinance};
 use zoning::report::{self, Ink};
 use zoning::survey::{self, Ask, Dialect, Survey};
+use zoning::Result;
 
 /// Which files version control knows about, per language, read at most once each.
 ///
@@ -44,7 +45,7 @@ impl<'a> Tracked<'a> {
     }
 }
 
-pub(crate) fn run() -> Result<ExitCode, String> {
+pub(crate) fn run() -> Result<ExitCode> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !matches!(args.first().map(String::as_str), Some("lsp" | "setup")) {
         zoning::setup::auto();
@@ -64,7 +65,8 @@ pub(crate) fn run() -> Result<ExitCode, String> {
             other => {
                 return Err(format!(
                     "unknown setup action `{other}` — try status, run, repair, or uninstall"
-                ));
+                )
+                .into());
             }
         };
         for line in zoning::setup::execute(action)? {
@@ -168,7 +170,7 @@ fn ungoverned(
     root: &Path,
     tracked: &mut Tracked<'_>,
     out: &mut String,
-) -> Result<bool, String> {
+) -> Result<bool> {
     let Ink { red, dim, reset, .. } = options.ink;
     let mut clean = true;
     for parcel in ordinance::parcels(root, &options.under) {

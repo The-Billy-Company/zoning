@@ -4,6 +4,7 @@ use std::process::ExitCode;
 
 use zoning::ordinance;
 use zoning::report::Ink;
+use zoning::Result;
 
 use super::Tracked;
 use super::args::Options;
@@ -13,7 +14,7 @@ use super::scope::{barren, declared, module, pathdiff, probe, tail};
 ///
 /// The directory is taken as typed, from the shell's own working directory — `draft .`
 /// means here, whatever subtree a verify would have chosen to read.
-pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<ExitCode, String> {
+pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<ExitCode> {
     let here =
         std::env::current_dir().map_err(|e| format!("cannot read the current directory: {e}"))?;
     let target = options.args.first().map_or(".", String::as_str);
@@ -30,7 +31,8 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
              and `root {target}` inside its contract is how that gets said. Draft the package: \
              `zoning draft {up}`",
             tail(parent)
-        ));
+        )
+        .into());
     }
     let name = declared(&dir, options.language)
         .or_else(|| dir.file_name().map(|n| n.to_string_lossy().into_owned()))
@@ -45,11 +47,12 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
              governs one module's imports, and these do not share a module",
             names.len(),
             names.join(", ")
-        ));
+        )
+        .into());
     }
     let found = probe(&dir, source, options.language, tracked, &nested);
     if found.files.is_empty() {
-        return Err(barren(&dir, source, options.language, &nested));
+        return Err(barren(&dir, source, options.language, &nested).into());
     }
     let text = zoning::draft::contract(&found, &name, source, &nested);
 
@@ -65,7 +68,8 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
             "{} already exists — a draft never overwrites a contract somebody wrote; \
              drop `--write` to read the draft instead",
             file.display()
-        ));
+        )
+        .into());
     }
     std::fs::create_dir_all(&home).map_err(|e| format!("{}: {e}", home.display()))?;
     std::fs::write(&file, &text).map_err(|e| format!("{}: {e}", file.display()))?;

@@ -73,6 +73,8 @@
 //! # Ok::<(), zoning::ordinance::Fault>(())
 //! ```
 
+mod error;
+
 pub mod draft;
 pub mod judge;
 pub mod lsp;
@@ -81,6 +83,8 @@ pub mod pattern;
 pub mod report;
 pub mod setup;
 pub mod survey;
+
+pub use error::{Error, Result};
 
 use std::path::{Path, PathBuf};
 

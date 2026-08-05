@@ -8,8 +8,9 @@ use super::language::{range, utf16_column};
 use crate::judge;
 use crate::ordinance::{Fault, Ordinance};
 use crate::survey::{self, Ask, Survey};
+use crate::Result;
 
-pub(super) fn publish(connection: &Connection, uri: &str, text: &str) -> Result<(), String> {
+pub(super) fn publish(connection: &Connection, uri: &str, text: &str) -> Result<()> {
     let path = uri_path(uri);
     if path.extension().is_none_or(|extension| extension != "zone") {
         return send(connection, uri, &architecture(&path, text));
@@ -20,7 +21,7 @@ pub(super) fn publish(connection: &Connection, uri: &str, text: &str) -> Result<
     send(connection, uri, &diagnostics)
 }
 
-pub(super) fn clear(connection: &Connection, uri: &str) -> Result<(), String> {
+pub(super) fn clear(connection: &Connection, uri: &str) -> Result<()> {
     send(connection, uri, &[])
 }
 
@@ -83,12 +84,13 @@ fn owning_contract(path: &Path) -> Option<(Ordinance, Survey)> {
     None
 }
 
-fn send(connection: &Connection, uri: &str, diagnostics: &[Value]) -> Result<(), String> {
+fn send(connection: &Connection, uri: &str, diagnostics: &[Value]) -> Result<()> {
     let notification = Notification::new(
         "textDocument/publishDiagnostics".to_owned(),
         json!({"uri": uri, "diagnostics": diagnostics}),
     );
-    connection.sender.send(notification.into()).map_err(|error| error.to_string())
+    connection.sender.send(notification.into()).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn diagnostic(fault: &Fault) -> Value {

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use zoning::report::Ink;
 use zoning::survey::{self, Dialect};
+use zoning::Result;
 
 const USAGE: &str = "\
 zoning — declare where a package's imports may go, and judge the real graph.
@@ -78,7 +79,7 @@ pub(super) enum Verb {
 
 /// Parse argv. `Ok(None)` means the run is already over — help or version was asked
 /// for, and answering a question is not an error.
-pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options>, String> {
+pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options>> {
     let mut options = Options {
         verb: Verb::Verify,
         args: Vec::new(),
@@ -98,8 +99,8 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
     let mut rest = argv.peekable();
 
     while let Some(arg) = rest.next() {
-        let mut value = |flag: &str| -> Result<String, String> {
-            rest.next().ok_or_else(|| format!("`{flag}` needs a value"))
+        let mut value = |flag: &str| -> Result<String> {
+            rest.next().ok_or_else(|| format!("`{flag}` needs a value").into())
         };
         match arg.as_str() {
             "-h" | "--help" => {
@@ -133,7 +134,7 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
             }
             "--no-color" | "--no-colour" => options.ink = Ink::PLAIN,
             other if other.starts_with('-') => {
-                return Err(format!("unknown option `{other}` — try `zoning --help`"));
+                return Err(format!("unknown option `{other}` — try `zoning --help`").into());
             }
             other if !seen_verb => {
                 options.verb = match other {
@@ -150,7 +151,8 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
                         return Err(format!(
                             "unknown verb `{other}` — try verify, status, list, show, map, \
                              explain, draft, lsp, or setup"
-                        ));
+                        )
+                        .into());
                     }
                 };
                 seen_verb = true;
@@ -164,19 +166,19 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
             if options.verb != Verb::Lsp || options.stdio => {}
         (Verb::Setup, 1) => {}
         (Verb::Explain, _) => {
-            return Err(
-                "`explain` takes one file, or two to judge the import between them".to_owned()
-            );
+            return Err("`explain` takes one file, or two to judge the import between them"
+                .into());
         }
-        (Verb::Draft, _) => return Err("`draft` takes one directory".to_owned()),
-        (Verb::Lsp, _) => return Err("`lsp` requires `--stdio`".to_owned()),
-        (Verb::Setup, _) => return Err("`setup` takes one action".to_owned()),
+        (Verb::Draft, _) => return Err("`draft` takes one directory".into()),
+        (Verb::Lsp, _) => return Err("`lsp` requires `--stdio`".into()),
+        (Verb::Setup, _) => return Err("`setup` takes one action".into()),
         (_, 0) => {}
         _ => {
             return Err(format!(
                 "unexpected argument `{}` — only `explain`, `draft`, and `setup` take arguments",
                 options.args.join(" ")
-            ));
+            )
+            .into());
         }
     }
     Ok(Some(options))

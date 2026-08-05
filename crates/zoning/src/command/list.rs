@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use zoning::ordinance;
 use zoning::report::Ink;
 use zoning::survey;
+use zoning::Result;
 
 use super::Tracked;
 use super::args::Options;
@@ -21,7 +22,7 @@ pub(super) fn list(
     options: &Options,
     root: &Path,
     tracked: &mut Tracked<'_>,
-) -> Result<ExitCode, String> {
+) -> Result<ExitCode> {
     let Ink { green, yellow, dim, reset, .. } = options.ink;
     let parcels = ordinance::parcels(root, &options.under);
     let mut out = String::new();

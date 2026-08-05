@@ -8,6 +8,8 @@ use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
+
 const EXTENSION_ID: &str = "the-billy-company.zoning";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -55,7 +57,7 @@ pub enum Action {
 ///
 /// # Errors
 /// Returns an error when editor state cannot be read or changed atomically.
-pub fn execute(action: Action) -> Result<Vec<String>, String> {
+pub fn execute(action: Action) -> Result<Vec<String>> {
     let home = home()?;
     execute_in(action, &home)
 }
@@ -83,7 +85,7 @@ pub fn auto() {
     }
 }
 
-fn execute_in(action: Action, home: &Path) -> Result<Vec<String>, String> {
+fn execute_in(action: Action, home: &Path) -> Result<Vec<String>> {
     let state = state_path(home);
     match action {
         Action::Status => Ok(status(home)),
@@ -102,8 +104,7 @@ fn execute_in(action: Action, home: &Path) -> Result<Vec<String>, String> {
                 &serde_json::to_vec_pretty(&Manifest {
                     version: env!("CARGO_PKG_VERSION").to_owned(),
                     editors,
-                })
-                .map_err(|error| error.to_string())?,
+                })?,
             )?;
             Ok(lines)
         }
@@ -186,7 +187,7 @@ fn present(home: &Path, editor: Editor) -> bool {
     }
 }
 
-fn install(home: &Path, editor: Editor) -> Result<(), String> {
+fn install(home: &Path, editor: Editor) -> Result<()> {
     match editor {
         Editor::Cursor | Editor::Code => install_graphical(home, editor),
         Editor::Zed => install_zed(home),
@@ -194,7 +195,7 @@ fn install(home: &Path, editor: Editor) -> Result<(), String> {
     }
 }
 
-fn install_graphical(home: &Path, editor: Editor) -> Result<(), String> {
+fn install_graphical(home: &Path, editor: Editor) -> Result<()> {
     let cli = if editor == Editor::Cursor { "cursor" } else { "code" };
     if env::var_os("HOME").is_some_and(|actual| Path::new(&actual) == home) && command(cli) {
         let vsix = home.join(".local/share/zoning/editor-setup/zoning.vsix");
@@ -207,7 +208,8 @@ fn install_graphical(home: &Path, editor: Editor) -> Result<(), String> {
             return Err(format!(
                 "{cli} could not install zoning: {}",
                 String::from_utf8_lossy(&install.stderr).trim()
-            ));
+            )
+            .into());
         }
         let listed = Command::new(cli)
             .arg("--list-extensions")
@@ -217,7 +219,7 @@ fn install_graphical(home: &Path, editor: Editor) -> Result<(), String> {
             .lines()
             .any(|extension| extension.eq_ignore_ascii_case(EXTENSION_ID))
         {
-            return Err(format!("{cli} did not report {EXTENSION_ID} after installation"));
+            return Err(format!("{cli} did not report {EXTENSION_ID} after installation").into());
         }
         return Ok(());
     }
@@ -230,7 +232,7 @@ fn install_graphical(home: &Path, editor: Editor) -> Result<(), String> {
     Ok(())
 }
 
-fn install_zed(home: &Path) -> Result<(), String> {
+fn install_zed(home: &Path) -> Result<()> {
     let settings = if home.join("Library/Application Support/Zed").exists() {
         home.join("Library/Application Support/Zed/settings.json")
     } else {
@@ -244,7 +246,7 @@ fn install_zed(home: &Path) -> Result<(), String> {
     write_text(&settings, &updated)
 }
 
-fn add_zed_extension(settings: &str) -> Result<String, String> {
+fn add_zed_extension(settings: &str) -> Result<String> {
     if settings.contains("\"zoning\"") {
         return Ok(settings.to_owned());
     }
@@ -264,7 +266,7 @@ fn add_zed_extension(settings: &str) -> Result<String, String> {
     Ok(updated)
 }
 
-fn install_vim(home: &Path, editor: Editor) -> Result<(), String> {
+fn install_vim(home: &Path, editor: Editor) -> Result<()> {
     let root = installed_path(home, editor);
     write_text(&root.join("ftdetect/zoning.vim"), VIM_DETECT)?;
     write_text(&root.join("syntax/zoning.vim"), VIM_SYNTAX)?;
@@ -275,7 +277,7 @@ fn install_vim(home: &Path, editor: Editor) -> Result<(), String> {
     Ok(())
 }
 
-fn remove(home: &Path, editor: Editor) -> Result<(), String> {
+fn remove(home: &Path, editor: Editor) -> Result<()> {
     if editor == Editor::Zed {
         let path = installed_path(home, editor);
         let Ok(settings) = fs::read_to_string(&path) else {
@@ -325,21 +327,21 @@ fn state_path(home: &Path) -> PathBuf {
     home.join(".local/share/zoning/editor-setup/manifest.json")
 }
 
-fn read_manifest(path: &Path) -> Result<Option<Manifest>, String> {
+fn read_manifest(path: &Path) -> Result<Option<Manifest>> {
     match fs::read(path) {
-        Ok(bytes) => serde_json::from_slice(&bytes)
-            .map(Some)
-            .map_err(|error| format!("cannot read zoning setup state {}: {error}", path.display())),
+        Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(|error| {
+            format!("cannot read zoning setup state {}: {error}", path.display()).into()
+        }),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(format!("cannot read {}: {error}", path.display())),
+        Err(error) => Err(format!("cannot read {}: {error}", path.display()).into()),
     }
 }
 
-fn write_text(path: &Path, text: &str) -> Result<(), String> {
+fn write_text(path: &Path, text: &str) -> Result<()> {
     write_atomic(path, text.as_bytes())
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     let parent = path.parent().ok_or_else(|| format!("{} has no parent", path.display()))?;
     fs::create_dir_all(parent)
         .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
@@ -347,7 +349,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::write(&temporary, bytes)
         .map_err(|error| format!("cannot write {}: {error}", temporary.display()))?;
     fs::rename(&temporary, path)
-        .map_err(|error| format!("cannot install {}: {error}", path.display()))
+        .map_err(|error| format!("cannot install {}: {error}", path.display()).into())
 }
 
 fn command(name: &str) -> bool {
@@ -355,8 +357,8 @@ fn command(name: &str) -> bool {
         .is_some_and(|path| env::split_paths(&path).any(|dir| dir.join(name).is_file()))
 }
 
-fn home() -> Result<PathBuf, String> {
-    env::var_os("HOME").map(PathBuf::from).ok_or("HOME is not set".to_owned())
+fn home() -> Result<PathBuf> {
+    env::var_os("HOME").map(PathBuf::from).ok_or_else(|| "HOME is not set".into())
 }
 
 fn vscode_manifest() -> String {
@@ -398,7 +400,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn zed_edit_is_surgical_and_idempotent() -> Result<(), String> {
+    fn zed_edit_is_surgical_and_idempotent() -> Result<()> {
         let original = "{\n  // mine\n  \"theme\": \"A\"\n}\n";
         let once = add_zed_extension(original)?;
         assert!(once.contains("// mine"));
@@ -408,16 +410,16 @@ mod tests {
     }
 
     #[test]
-    fn fake_home_install_repair_and_uninstall_are_owned() -> Result<(), String> {
+    fn fake_home_install_repair_and_uninstall_are_owned() -> Result<()> {
         let home = std::env::temp_dir().join(format!(
             "zoning-setup-{}-{}",
             std::process::id(),
             std::thread::current().name().unwrap_or("test")
         ));
         if home.exists() {
-            fs::remove_dir_all(&home).map_err(|error| error.to_string())?;
+            fs::remove_dir_all(&home)?;
         }
-        fs::create_dir_all(&home).map_err(|error| error.to_string())?;
+        fs::create_dir_all(&home)?;
         let editors = vec![Editor::Cursor, Editor::Code, Editor::Zed, Editor::Neovim, Editor::Vim];
         for editor in &editors {
             install(&home, *editor)?;
@@ -428,8 +430,7 @@ mod tests {
             &serde_json::to_vec(&Manifest {
                 version: env!("CARGO_PKG_VERSION").to_owned(),
                 editors: editors.clone(),
-            })
-            .map_err(|error| error.to_string())?,
+            })?,
         )?;
 
         let result = execute_in(Action::Uninstall, &home)?;
@@ -438,15 +439,11 @@ mod tests {
         for editor in editors {
             let path = installed_path(&home, editor);
             if editor == Editor::Zed {
-                assert!(
-                    !fs::read_to_string(path)
-                        .map_err(|error| error.to_string())?
-                        .contains("\"zoning\"")
-                );
+                assert!(!fs::read_to_string(path)?.contains("\"zoning\""));
             } else {
                 assert!(!path.exists());
             }
         }
-        fs::remove_dir_all(home).map_err(|error| error.to_string())
+        Ok(fs::remove_dir_all(home)?)
     }
 }
