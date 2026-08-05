@@ -5,10 +5,10 @@ use lsp_server::{Connection, Notification};
 use serde_json::{Value, json};
 
 use super::language::{range, utf16_column};
+use crate::Result;
 use crate::judge;
 use crate::ordinance::{Fault, Ordinance};
 use crate::survey::{self, Ask, Survey};
-use crate::Result;
 
 pub(super) fn publish(connection: &Connection, uri: &str, text: &str) -> Result<()> {
     let path = uri_path(uri);

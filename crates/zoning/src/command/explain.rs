@@ -2,10 +2,10 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use zoning::Result;
 use zoning::ordinance::{self, Ordinance};
 use zoning::report;
 use zoning::survey::{Ask, Survey};
-use zoning::Result;
 
 use super::Tracked;
 use super::args::Options;
@@ -27,9 +27,7 @@ pub(super) fn explain(
         .args
         .iter()
         .map(|arg| {
-            here.join(arg)
-                .canonicalize()
-                .map_err(|_| format!("no such file: `{arg}`").into())
+            here.join(arg).canonicalize().map_err(|_| format!("no such file: `{arg}`").into())
         })
         .collect::<Result<_>>()?;
 
@@ -59,8 +57,10 @@ pub(super) fn explain(
         dialect: contract.dialect,
         tracked: tracked.of(contract.dialect),
     });
-    let named: Vec<String> =
-        wanted.iter().map(|path| judged(path, &contract, &found, tracked)).collect::<Result<_>>()?;
+    let named: Vec<String> = wanted
+        .iter()
+        .map(|path| judged(path, &contract, &found, tracked))
+        .collect::<Result<_>>()?;
 
     let answer = match named.as_slice() {
         [one] => report::file(one, &contract, &found, &options.ink),

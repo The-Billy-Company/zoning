@@ -3,10 +3,10 @@ use std::io::Write as _;
 use std::path::Path;
 use std::process::ExitCode;
 
+use zoning::Result;
 use zoning::ordinance;
 use zoning::report::Ink;
 use zoning::survey;
-use zoning::Result;
 
 use super::Tracked;
 use super::args::Options;
@@ -18,11 +18,7 @@ use super::scope::{basename, declared, module, probe, tail};
 /// The question adoption actually asks. A list of the packages that *have* a contract
 /// cannot tell you whether you are finished, and the ungoverned ones are why anybody
 /// runs this — so they are the rows that carry a command.
-pub(super) fn list(
-    options: &Options,
-    root: &Path,
-    tracked: &mut Tracked<'_>,
-) -> Result<ExitCode> {
+pub(super) fn list(options: &Options, root: &Path, tracked: &mut Tracked<'_>) -> Result<ExitCode> {
     let Ink { green, yellow, dim, reset, .. } = options.ink;
     let parcels = ordinance::parcels(root, &options.under);
     let mut out = String::new();

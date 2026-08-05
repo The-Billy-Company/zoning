@@ -12,11 +12,11 @@ use std::process::ExitCode;
 
 use args::{Options, Verb};
 use scope::{basename, module, probe, scope, tail};
+use zoning::Result;
 use zoning::judge::{self, Verdict};
 use zoning::ordinance::{self, Fault, Ordinance};
 use zoning::report::{self, Ink};
 use zoning::survey::{self, Ask, Dialect, Survey};
-use zoning::Result;
 
 /// Which files version control knows about, per language, read at most once each.
 ///

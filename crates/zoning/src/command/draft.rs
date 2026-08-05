@@ -2,9 +2,9 @@ use std::io::Write as _;
 use std::path::Path;
 use std::process::ExitCode;
 
+use zoning::Result;
 use zoning::ordinance;
 use zoning::report::Ink;
-use zoning::Result;
 
 use super::Tracked;
 use super::args::Options;

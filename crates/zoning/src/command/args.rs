@@ -2,9 +2,9 @@ use std::collections::HashSet;
 use std::io::IsTerminal as _;
 use std::path::PathBuf;
 
+use zoning::Result;
 use zoning::report::Ink;
 use zoning::survey::{self, Dialect};
-use zoning::Result;
 
 const USAGE: &str = "\
 zoning — declare where a package's imports may go, and judge the real graph.
@@ -166,8 +166,7 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
             if options.verb != Verb::Lsp || options.stdio => {}
         (Verb::Setup, 1) => {}
         (Verb::Explain, _) => {
-            return Err("`explain` takes one file, or two to judge the import between them"
-                .into());
+            return Err("`explain` takes one file, or two to judge the import between them".into());
         }
         (Verb::Draft, _) => return Err("`draft` takes one directory".into()),
         (Verb::Lsp, _) => return Err("`lsp` requires `--stdio`".into()),
