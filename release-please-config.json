@@ -17,7 +17,11 @@
     "rewrites the semver on any line carrying an `x-release-please-version`",
     "annotation — one line, in this repo. The shared `package-release version`",
     "command fails if that marked line is missing from this list, so the two",
-    "cannot drift apart.",
+    "cannot drift apart. `editors/vscode/package.json` is a second mirror —",
+    "the VSIX manifest version, which `editors/vscode/scripts/validate.mjs`",
+    "asserts still equals Cargo.toml's — bumped through the `json` updater",
+    "(JSONPath, not an annotation, since JSON has no comment syntax) so a",
+    "release can never advance one and forget the other.",
     "",
     "── Changelog ownership",
     "towncrier owns CHANGELOG.md — the curated fragments under changelog.d/ are",
@@ -65,7 +69,10 @@
       "release-type": "simple",
       "package-name": "zoning",
       "skip-changelog": true,
-      "extra-files": [{ "type": "generic", "path": "Cargo.toml" }]
+      "extra-files": [
+        { "type": "generic", "path": "Cargo.toml" },
+        { "type": "json", "path": "editors/vscode/package.json", "jsonpath": "$.version" }
+      ]
     }
   }
 }
