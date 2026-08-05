@@ -38,7 +38,7 @@ in a `.zone` file, and the tool judges that declaration against the real
 `@import` graph.
 
 ```
-✗ zoning [irregex]: 310 files, 1436 imports, 2 violation(s), 3 allowed
+✗ zone [irregex]: 310 files, 1436 imports, 2 violation(s), 3 allowed
 src/kernel/regex/glean/differential_test.zig:32:1: [zone] zone `regex` imports up into `query` (`kernel/query/query.zig`) — imports may only point down the stack
 src/exec/cold/emit/render.zig:31:1: [seal] reaches past the seal on `kernel/scan/` into `kernel/scan/simd.zig` — enter through `kernel/scan/scan.zig`
 
@@ -98,10 +98,12 @@ to keep apart. Zig does not, which is why this exists.
 
 ## Install
 
-The binary ships from crates.io and PyPI, prebuilt:
+The binary ships from crates.io and PyPI, prebuilt, under two names — `zone`
+is the command to type, `zoning` is the same executable installed alongside
+it for anyone who typed the package name out of habit:
 
 ```bash
-cargo install zoning          # the static binary
+cargo install zoning          # the static binary — installs `zone` and `zoning`
 uv tool install zoning        # the same thing, through PyPI
 pipx install zoning
 ```
@@ -109,7 +111,7 @@ pipx install zoning
 Or build it here:
 
 ```bash
-cargo build --release         # target/release/zoning
+cargo build --release         # target/release/{zone,zoning}
 ```
 
 The first interactive run detects Cursor, VS Code, Zed, Neovim, and Vim and
@@ -118,10 +120,10 @@ a non-terminal process, when `ZONING_NO_SETUP=1`, or while serving LSP. The
 explicit lifecycle is always available:
 
 ```bash
-zoning setup status
-zoning setup run
-zoning setup repair
-zoning setup uninstall
+zone setup status
+zone setup run
+zone setup repair
+zone setup uninstall
 ```
 
 ## Editor Language
@@ -130,7 +132,7 @@ zoning setup uninstall
 The same executable serves diagnostics and language intelligence:
 
 ```bash
-zoning lsp --stdio
+zone lsp --stdio
 ```
 
 Cursor and VS Code receive the exact SVG file identity plus completion, hover,
@@ -296,7 +298,7 @@ A variance that stops matching is a hard failure. Pay the debt and the build
 tells you to delete the entry; exception lists in most tools accrete into
 folklore nobody dares touch, and this one can only shrink.
 
-`zoning verify --suggest` drafts the stanzas for today's violations and writes
+`zone verify --suggest` drafts the stanzas for today's violations and writes
 nothing. A machine can find the edge; it cannot supply the reason, and the
 reason is the entire value.
 
@@ -317,16 +319,16 @@ Each exists because a compiler structurally cannot enforce it.
 
 Six of them are claims about how a package's files sit relative to each other, so
 a single-file module has almost nothing for a contract to say; `use` and `escape`
-are the two that still bind. `zoning list` says so rather than letting you write
+are the two that still bind. `zone list` says so rather than letting you write
 the file and wonder.
 
 ## Reading a Map
 
-`zoning map` draws the contract the way gravity works, so "imports point down
+`zone map` draws the contract the way gravity works, so "imports point down
 the page" stops being a rule you memorise and becomes a thing you can see:
 
 ```
-zoning map · irregex · 26 zones, high to low
+zone map · irregex · 26 zones, high to low
 ──────────────────────────────────────────────────────────────────────────
  25 │ ffi      ██············  7 ↓5      surface/ffi/**
  24 │ api      █·············  2 ↓3    ⊘ surface/api.zig surface/api_test.…
@@ -360,9 +362,9 @@ red, which teaches the reader exactly one lesson: the gate is noise.
 So don't write the first one. Take it:
 
 ```bash
-zoning list                   # every package here, governed or not
-zoning draft . --write        # the contract this graph already obeys
-zoning verify                 # green, on the first run
+zone list                     # every package here, governed or not
+zone draft . --write          # the contract this graph already obeys
+zone verify                   # green, on the first run
 ```
 
 `list` prints the exact `draft` invocation for each ungoverned package, so the
@@ -391,8 +393,8 @@ The question you actually have day to day is narrower, and `explain` answers it
 without a contract edit or a full run:
 
 ```bash
-zoning explain src/exec/cold/emit/render.zig            # where does this file stand?
-zoning explain src/kernel/math/sqrt.zig src/portal.zig  # may I write this import?
+zone explain src/exec/cold/emit/render.zig            # where does this file stand?
+zone explain src/kernel/math/sqrt.zig src/portal.zig  # may I write this import?
 ```
 
 The second form works whether or not the import exists yet, which is the point:
@@ -405,7 +407,7 @@ contract" call for opposite actions.
 The verdict reaches the exit code, so the question is also a shell question:
 
 ```bash
-zoning explain from.zig to.zig && $EDITOR from.zig
+zone explain from.zig to.zig && $EDITOR from.zig
 ```
 
 ## The Verbs
@@ -437,7 +439,7 @@ One step, and no Rust toolchain in the job:
 
 ```yaml
 - name: Import topology
-  run: uv run --no-project --with zoning==1.0.0 zoning verify --complete
+  run: uv run --no-project --with zoning==1.1.0 zone verify --complete
 ```
 
 No build, no compile database, no network beyond fetching itself. Pin the
@@ -460,7 +462,7 @@ and the compiler maintains it.
 With a toolchain already in the job, the same binary comes from crates.io:
 
 ```yaml
-- run: cargo install zoning --locked && zoning verify --complete
+- run: cargo install zoning --locked && zone verify --complete
 ```
 
 ## Languages

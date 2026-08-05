@@ -254,7 +254,7 @@ fn a_draft_over_a_tangled_package_refuses_to_parse_until_somebody_writes_the_rea
 
 #[test]
 fn an_explained_edge_carries_its_verdict_for_the_shell() {
-    // `zoning explain a b && …` is only worth writing if the answer reaches the exit
+    // `zone explain a b && …` is only worth writing if the answer reaches the exit
     // code, so the rendered answer says which it was rather than making the caller grep
     // its own prose. Judged over the fixture whose whole purpose is an uphill import.
     let (ordinance, survey) = fixture("fail", "uphill");

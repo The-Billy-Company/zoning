@@ -96,8 +96,8 @@ pub(crate) fn run() -> Result<ExitCode> {
     if contracts.is_empty() && !options.complete {
         let Ink { green, reset, dim, .. } = options.ink;
         println!(
-            "{green}✓{reset} zoning: nothing governed under {} {dim}— `zoning list` shows what \
-             could be, `zoning draft .` writes the first one{reset}",
+            "{green}✓{reset} zone: nothing governed under {} {dim}— `zone list` shows what \
+             could be, `zone draft .` writes the first one{reset}",
             tail(&root)
         );
         return Ok(ExitCode::SUCCESS);
@@ -190,8 +190,8 @@ fn ungoverned(
         clean = false;
         let _ = writeln!(
             out,
-            "{red}✗{reset} zoning [{}]: no contract {dim}({} {} files ungoverned) \
-             → zoning draft {}{reset}",
+            "{red}✗{reset} zone [{}]: no contract {dim}({} {} files ungoverned) \
+             → zone draft {}{reset}",
             basename(root, &parcel.dir),
             found.files.len(),
             parcel.language,
@@ -203,5 +203,5 @@ fn ungoverned(
 
 fn report_fault(fault: &Fault, ink: Ink) {
     let Ink { red, reset, .. } = ink;
-    eprintln!("{red}✗{reset} zoning: {fault}");
+    eprintln!("{red}✗{reset} zone: {fault}");
 }

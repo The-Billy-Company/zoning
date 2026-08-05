@@ -2,7 +2,7 @@
 
 `zoning` reads a tree it did not write — someone else's source, someone else's
 `.zone` contract — and answers a question people wire straight into CI and,
-now that `zoning lsp --stdio` exists, straight into their editor: *does this
+now that `zone lsp --stdio` exists, straight into their editor: *does this
 import graph obey the declared shape?* The threat model here is not "someone
 attacks the binary" so much as **the tree is the attacker** — a crafted
 contract, a hostile import graph, a symlink, a path that wasn't meant to be
@@ -71,12 +71,12 @@ much: a gate whose verdict can change without a commit is not a gate.
   folklore. Anything that lets a stale variance keep matching, or lets a
   variance's glob reach edges its author never saw, defeats that.
 - **The editor payload writing somewhere it shouldn't.** The first interactive
-  run (and `zoning setup run`) detects an installed editor and writes its
+  run (and `zone setup run`) detects an installed editor and writes its
   language-server/extension payload into that editor's own config directory.
-  Writing outside the paths `zoning setup status` reports, or being trickable
-  into writing there, is in scope — as is `zoning setup uninstall` leaving
+  Writing outside the paths `zone setup status` reports, or being trickable
+  into writing there, is in scope — as is `zone setup uninstall` leaving
   behind, or removing, anything it did not itself record.
-- **The language server trusting the wrong boundary.** `zoning lsp --stdio`
+- **The language server trusting the wrong boundary.** `zone lsp --stdio`
   is meant for exactly one editor process talking to exactly one instance over
   its own stdio pipe. Anything that lets a second process attach to that pipe,
   or lets a crafted `.zone` file or source buffer make the server do something

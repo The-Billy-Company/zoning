@@ -7,16 +7,16 @@ use zoning::report::Ink;
 use zoning::survey::{self, Dialect};
 
 const USAGE: &str = "\
-zoning — declare where a package's imports may go, and judge the real graph.
+zone — declare where a package's imports may go, and judge the real graph.
 
 USAGE
-    zoning [VERB] [ARGS] [OPTIONS]
+    zone [VERB] [ARGS] [OPTIONS]
 
 VERBS
     verify              judge every governed package (default)
     status              verify, plus the census: zone counts, hops, burndown queue
     list                every package in the tree, governed or not
-    show                the resolved contract, as zoning understood it
+    show                the resolved contract, as zone understood it
     map                 the zone stack drawn high to low
     explain FILE        where one file stands: zone, reach, grants, who imports it
     explain FROM TO     whether that import is allowed, and the clause that decides
@@ -108,7 +108,7 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("zoning {}", env!("CARGO_PKG_VERSION"));
+                println!("zone {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             "--package" => {
@@ -134,7 +134,7 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
             }
             "--no-color" | "--no-colour" => options.ink = Ink::PLAIN,
             other if other.starts_with('-') => {
-                return Err(format!("unknown option `{other}` — try `zoning --help`").into());
+                return Err(format!("unknown option `{other}` — try `zone --help`").into());
             }
             other if !seen_verb => {
                 options.verb = match other {

@@ -4,8 +4,8 @@ One tiny package per law, so the suite proves each law both fires and stays
 quiet without depending on any real repository being checked out beside this
 one.
 
-- `pass/` — packages whose code obeys their contract. `zoning verify` exits 0.
-- `fail/` — packages that break exactly one thing. `zoning verify` exits 1, and
+- `pass/` — packages whose code obeys their contract. `zone verify` exits 0.
+- `fail/` — packages that break exactly one thing. `zone verify` exits 1, and
   the integration test in `tests/laws.rs` asserts *which* law fired, because a
   gate that fails for the wrong reason is a gate that will pass for the wrong
   reason too.

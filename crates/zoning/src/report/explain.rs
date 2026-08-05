@@ -11,8 +11,8 @@
 //! ask is before the edit.
 //!
 //! The hypothetical is judged by the real laws over a survey holding just that edge,
-//! not by a second copy of the rules. A `zoning explain` that could disagree with
-//! `zoning verify` would be worse than no answer at all.
+//! not by a second copy of the rules. A `zone explain` that could disagree with
+//! `zone verify` would be worse than no answer at all.
 
 use std::fmt::Write as _;
 
@@ -24,7 +24,7 @@ use crate::survey::{Edge, Survey};
 /// A rendered answer, and whether the answer was yes.
 ///
 /// The text is for the person and the flag is for the shell, because "may I write this
-/// import" is a question worth asking from a script: `zoning explain a.zig b.zig &&
+/// import" is a question worth asking from a script: `zone explain a.zig b.zig &&
 /// $EDITOR a.zig` only reads the way it looks if the verdict reaches the exit code. A
 /// diagnostic verb that always exits 0 forces the caller to grep its prose, which makes
 /// the prose an interface nobody can change.

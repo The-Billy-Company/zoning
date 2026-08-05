@@ -74,7 +74,7 @@ pub(super) fn list(options: &Options, root: &Path, tracked: &mut Tracked<'_>) ->
             let _ = writeln!(
                 out,
                 "  {yellow}ungoverned{reset}  {name:<14} {} {dim}({}{worth}){reset}\n\
-                 \x20                            {dim}→ zoning draft {}{reset}",
+                 \x20                            {dim}→ zone draft {}{reset}",
                 parcel.dir, parcel.language, parcel.dir
             );
             continue;
@@ -95,7 +95,7 @@ pub(super) fn list(options: &Options, root: &Path, tracked: &mut Tracked<'_>) ->
             .collect();
         let _ = writeln!(
             out,
-            "  {dim}no package manifest anywhere under {} — zoning finds a package by the\n\
+            "  {dim}no package manifest anywhere under {} — zone finds a package by the\n\
              \x20 file that declares one ({}){reset}",
             tail(root),
             known.join("; ")

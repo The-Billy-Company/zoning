@@ -28,7 +28,7 @@ use crate::survey::Survey;
 /// Deliberately silent about seals and keeps. Those are claims — "this directory is a
 /// deep module", "these peers are independent" — and a machine inferring them from
 /// today's call sites would be guessing at intent and would guess wrong the first time
-/// somebody adds a legitimate second caller. `zoning status` lists the directories that
+/// somebody adds a legitimate second caller. `zone status` lists the directories that
 /// *could* be sealed, which is the right place for a suggestion: a burndown queue a
 /// person works through, not a line that arrives pre-decided.
 #[must_use]
@@ -36,7 +36,7 @@ pub fn contract(survey: &Survey, package: &str, root: &str, nested: &[String]) -
     let facade = facade(survey);
     let zones = stack(survey, package, facade.as_deref());
     let mut out = format!(
-        "// {package} — import topology, drafted by `zoning draft` from the real\n\
+        "// {package} — import topology, drafted by `zone draft` from the real\n\
          // @import graph. Every line below is TRUE of the tree as it stands: this is\n\
          // a description, not a wish. Read it once, then start tightening it —\n\
          // merging two zones or sealing a directory is where the value is.\n\
@@ -95,7 +95,7 @@ pub fn contract(survey: &Survey, package: &str, root: &str, nested: &[String]) -
     let tangled = tangles(survey, &facade_globs);
     if tangled.is_empty() {
         out.push_str(
-            "\n// Nothing else to declare: this graph is already a stack. `zoning status`\n\
+            "\n// Nothing else to declare: this graph is already a stack. `zone status`\n\
              // lists the directories that could be sealed next.\n",
         );
         return out;

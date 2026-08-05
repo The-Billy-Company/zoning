@@ -43,8 +43,8 @@ pub(super) fn explain(
     }
     let Some(contract) = best else {
         return Err(format!(
-            "no governed package holds {} — `zoning list` shows what is governed, and \
-             `zoning draft <dir>` starts a contract for what is not",
+            "no governed package holds {} — `zone list` shows what is governed, and \
+             `zone draft <dir>` starts a contract for what is not",
             options.args.iter().map(|a| format!("`{a}`")).collect::<Vec<_>>().join(" and ")
         )
         .into());
@@ -70,7 +70,7 @@ pub(super) fn explain(
     print!("{}", answer.text);
     let _ = std::io::stdout().flush();
     // The same code `verify` uses for the same news, so "is this legal" is a shell
-    // question: `zoning explain a b && …`. A malformed invocation is still 2.
+    // question: `zone explain a b && …`. A malformed invocation is still 2.
     Ok(if answer.clean { ExitCode::SUCCESS } else { ExitCode::FAILURE })
 }
 

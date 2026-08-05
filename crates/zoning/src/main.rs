@@ -8,7 +8,7 @@ fn main() -> ExitCode {
     match command::run() {
         Ok(code) => code,
         Err(problem) => {
-            eprintln!("zoning: {problem}");
+            eprintln!("zone: {problem}");
             ExitCode::from(2)
         }
     }

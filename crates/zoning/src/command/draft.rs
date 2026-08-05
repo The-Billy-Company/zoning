@@ -29,7 +29,7 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
         return Err(format!(
             "`{target}` is where the code lives, not where the package is declared — `{}` is, \
              and `root {target}` inside its contract is how that gets said. Draft the package: \
-             `zoning draft {up}`",
+             `zone draft {up}`",
             tail(parent)
         )
         .into());
@@ -75,7 +75,7 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
     std::fs::write(&file, &text).map_err(|e| format!("{}: {e}", file.display()))?;
     let Ink { green, reset, dim, .. } = options.ink;
     println!(
-        "{green}✓{reset} wrote {} {dim}— now run `zoning verify --package {name}`{reset}",
+        "{green}✓{reset} wrote {} {dim}— now run `zone verify --package {name}`{reset}",
         file.display()
     );
     Ok(ExitCode::SUCCESS)

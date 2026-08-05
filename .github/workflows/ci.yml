@@ -105,7 +105,7 @@ jobs:
 
   # The PyPI half is the same binary in a different envelope, and the envelope is
   # what most consumers actually touch: a sibling repo's CI asks for
-  # `uvx zoning verify`, not for a Rust toolchain. So the wheel is built and its
+  # `uvx --from zoning zone verify`, not for a Rust toolchain. So the wheel is built and its
   # console script is *run* on every commit - a wheel that installs but whose
   # entry point does not resolve is the failure this catches, and it is invisible
   # to `cargo test`.
@@ -127,12 +127,14 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Build
         run: uv run --no-project --with 'maturin>=1.9,<2.0' maturin build --release --out dist
-      - name: The installed console script judges a fixture
+      - name: Both installed console scripts judge a fixture
         shell: bash
         run: |
           set -euo pipefail
           cd tests/fixtures/pass/layered
-          uv run --no-project --with "$(ls "$GITHUB_WORKSPACE"/dist/*.whl)" zoning verify --untracked
+          wheel="$(ls "$GITHUB_WORKSPACE"/dist/*.whl)"
+          uv run --no-project --with "$wheel" zone verify --untracked
+          uv run --no-project --with "$wheel" zoning verify --untracked
       - name: Metadata is publishable
         run: uv run --no-project --with 'twine>=6' twine check dist/*
 

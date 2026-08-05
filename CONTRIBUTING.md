@@ -65,8 +65,8 @@ cargo fmt --check
 
 ```bash
 cargo build --release
-for box in tests/fixtures/pass/*/; do target/release/zoning verify --untracked --root "$box"; done
-for box in tests/fixtures/fail/*/; do target/release/zoning verify --untracked --root "$box"; done  # each must fail
+for box in tests/fixtures/pass/*/; do target/release/zone verify --untracked --root "$box"; done
+for box in tests/fixtures/fail/*/; do target/release/zone verify --untracked --root "$box"; done  # each must fail
 cargo test --test properties --test fuzz            # the generators, per-PR case count
 ZONING_CASES=5000 ZONING_SEED=1 cargo test --release --test properties --test fuzz  # the nightly soak, replayed
 python3 tools/differential.py                       # parity against the tool this was rewritten from
@@ -102,7 +102,7 @@ matters at this size.
   library is called" — never resolve a path its own way. A dialect that could
   disagree with the others about what a cycle is would make the tool's verdict
   depend on which language you happened to be judging.
-- **A draft never guesses at a claim.** `zoning draft` derives the stack, the
+- **A draft never guesses at a claim.** `zone draft` derives the stack, the
   grants, and the reach ceiling from what the graph already does — all true
   today — but refuses to guess at seals, keeps, or a cycle's reason, because
   those are decisions a person makes, not facts a machine can infer from one

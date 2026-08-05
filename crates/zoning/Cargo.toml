@@ -28,5 +28,13 @@ path = "src/lib.rs"
 name = "zoning"
 path = "src/main.rs"
 
+# Same binary, second name: `zone` is the taught command, `zoning` is the
+# convenience alias people already have muscle memory (and the crate name)
+# for. Two [[bin]] entries pointing at one main.rs are two compiles of
+# identical source, never two implementations to keep in sync.
+[[bin]]
+name = "zone"
+path = "src/main.rs"
+
 [lints]
 workspace = true

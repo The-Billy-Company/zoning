@@ -19,7 +19,7 @@ pub fn verdict(found: &Verdict, ink: Ink, census: bool) -> String {
     let mark = if found.ok() { format!("{green}✓{reset}") } else { format!("{red}✗{reset}") };
     let stats = &found.census;
     let mut out = format!(
-        "{mark} zoning [{}]: {} files, {} imports, {} violation(s), {} allowed\n",
+        "{mark} zone [{}]: {} files, {} imports, {} violation(s), {} allowed\n",
         found.package,
         stats.files,
         stats.edges,

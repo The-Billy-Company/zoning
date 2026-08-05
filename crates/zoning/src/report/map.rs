@@ -49,7 +49,7 @@ pub fn map(ordinance: &Ordinance, survey: &Survey, ink: Ink) -> String {
     let count_width = widest.to_string().len();
 
     let mut out = format!(
-        "zoning map · {} · {depth} zones, high to low\n{dim}{}{reset}\n",
+        "zone map · {} · {depth} zones, high to low\n{dim}{}{reset}\n",
         ordinance.package,
         "─".repeat(RULE)
     );
