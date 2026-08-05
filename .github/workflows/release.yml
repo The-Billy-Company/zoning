@@ -152,10 +152,19 @@ jobs:
       # The OIDC token Trusted Publishing exchanges for an upload credential.
       id-token: write
     steps:
+      # Named explicitly, not by a blanket "every artifact this run produced":
+      # `editor` also uploads `zoning-vsix`, which is not a PyPI distribution
+      # format, and `gh-action-pypi-publish` refuses the whole batch the
+      # instant one file in `dist/` doesn't parse as a wheel or sdist.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
+          pattern: "wheel-*"
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdist
+          path: dist
       - id: tag
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
       # Probed before the OIDC token is minted, the same idempotency the
