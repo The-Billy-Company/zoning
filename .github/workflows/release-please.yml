@@ -139,7 +139,11 @@ jobs:
           version=$(python3 -c 'import json,os; print(json.loads(os.environ["RESULT"])["version"])')
           uv run --no-project --python 3.12 --with towncrier==25.8.0 \
             towncrier build --yes --version "$version"
-          if git diff --quiet -- CHANGELOG.md changelog.d; then
+          # towncrier stages its own edits (newsfile write + fragment removal go
+          # through `git add`/`git rm`), so a working-tree-vs-index diff is quiet
+          # the instant it finishes even when it rewrote CHANGELOG.md — compare
+          # against HEAD, the only ref that predates the build.
+          if git diff --quiet HEAD -- CHANGELOG.md changelog.d; then
             echo "nothing new to fold at $version"
             exit 0
           fi
