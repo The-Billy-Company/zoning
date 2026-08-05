@@ -22,8 +22,9 @@ base_for() {
 }
 
 lint_ref() (
-  local local_sha=$1 remote_sha=$2 base work snapshot
+  local local_sha=$1 remote_sha=$2 base work snapshot dir candidate path
   local -a markdown=() archive=()
+  local -A seen_dirs=() seen_configs=()
 
   [[ "${local_sha}" != "${zero}" ]] || return 0
   if [[ "${remote_sha}" == "${zero}" ]]; then
@@ -41,9 +42,28 @@ lint_ref() (
   snapshot=${work}/tree
   mkdir "${snapshot}"
   archive=("${markdown[@]}")
-  if git cat-file -e "${local_sha}:.markdownlint-cli2.jsonc" 2>/dev/null; then
-    archive+=(.markdownlint-cli2.jsonc)
-  fi
+  # markdownlint-cli2 resolves a config by walking a file's directory up to the
+  # root, and a scoped override (e.g. changelog.d/.markdownlint-cli2.jsonc,
+  # `extends`-ing the root one) is exactly how a directory whose files are
+  # deliberately headless — a towncrier fragment folds into CHANGELOG.md as
+  # prose, never as its own document — opts out of a root-wide rule. Archiving
+  # only the root config would make that override invisible to this snapshot
+  # and re-flag every fragment forever, so walk every changed file's ancestry
+  # the same way the linter would.
+  for path in "${markdown[@]}"; do
+    dir=$(dirname -- "${path}")
+    while [[ -z "${seen_dirs[${dir}]+_}" ]]; do
+      seen_dirs[${dir}]=1
+      candidate=$([[ "${dir}" == "." ]] && echo ".markdownlint-cli2.jsonc" || echo "${dir}/.markdownlint-cli2.jsonc")
+      if [[ -z "${seen_configs[${candidate}]+_}" ]] &&
+        git cat-file -e "${local_sha}:${candidate}" 2>/dev/null; then
+        seen_configs[${candidate}]=1
+        archive+=("${candidate}")
+      fi
+      [[ "${dir}" == "." ]] && break
+      dir=$(dirname -- "${dir}")
+    done
+  done
   git archive "${local_sha}" -- "${archive[@]}" | tar -x -C "${snapshot}"
 
   printf 'pre-push: linting %d Markdown file(s) at %.12s\n' "${#markdown[@]}" "${local_sha}"
