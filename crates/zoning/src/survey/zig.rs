@@ -22,6 +22,7 @@ const PROSE: Prose = Prose {
     block_comment: None,
     line_string: Some("\\\\"),
     quotes: b"\"'",
+    triple_quotes: &[],
 };
 
 impl Dialect for Zig {
@@ -110,7 +111,7 @@ impl Dialect for Zig {
         &PROSE
     }
 
-    fn imports(&self, source: &str, code: &[u8]) -> Vec<Import> {
+    fn imports(&self, _path: &str, _roots: &[&str], source: &str, code: &[u8]) -> Vec<Import> {
         let raw = source.as_bytes();
         let mut out = Vec::new();
         let mut i = 0;
@@ -189,7 +190,7 @@ mod tests {
 
     fn specs(source: &str) -> Vec<String> {
         let code = PROSE.code_only(source);
-        Zig.imports(source, &code).into_iter().map(|i| i.spec).collect()
+        Zig.imports("test.zig", &[], source, &code).into_iter().map(|i| i.spec).collect()
     }
 
     #[test]

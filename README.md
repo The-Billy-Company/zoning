@@ -72,17 +72,19 @@ build the day it stops being true.
 
 ## Should You Be Using This?
 
-- **Python** – [import-linter](https://github.com/seddonym/import-linter)
-  already does this, over the boundary Python gives you. A `python` dialect is
-  the next one here; until it lands, use import-linter.
-- **Java** – [ArchUnit](https://www.archunit.org/), likewise.
+- **Java** – [ArchUnit](https://www.archunit.org/) already does this, over the
+  boundary Java gives you.
 - **Go, wanting the boundary Go draws** – `go vet` and `internal/`, and nothing
   else to install.
 - **A language that draws no boundary, or a boundary coarser than the one you
-  want** – here.
+  want** – here. Zig has no module system inside a package at all; Python's
+  package graph exists but says nothing about which of *your* packages may
+  import which — [import-linter](https://github.com/seddonym/import-linter)
+  covers that ground too, if you would rather stay in one ecosystem's tooling.
 
 The dividing line is whether your language already separates the parts you mean
-to keep apart. Zig does not, which is why this exists.
+to keep apart, at the grain you actually want. Zig draws none; Python's is
+real but coarser than a zone stack, which is why both dialects exist here.
 
 ## Support
 
@@ -261,8 +263,9 @@ three directories down started dialing an HTTP client, and that is the dependenc
 that ends up hardest to remove.
 
 The standard library is exempt by construction, per dialect — `std`, `builtin`,
-`root` in Zig. Every zone has it, no zone chose it, and a contract that spent its
-lines declaring it would bury the handful of grants that are decisions.
+`root` in Zig; the whole standard library, version-independent, in Python.
+Every zone has it, no zone chose it, and a contract that spent its lines
+declaring it would bury the handful of grants that are decisions.
 
 A grant nobody exercises is stale, and stale is a failure. It is a permission
 somebody forgot to withdraw.
@@ -497,6 +500,18 @@ A contract names its own `language`, so a polyglot monorepo is one run rather th
 one run per dialect. `--language` sets the default for a package that has not
 said.
 
+Python is the second dialect, and it earns its keep on the same absence: a
+package's `import`s reach any module on `sys.path`, and nothing about the
+language says which of *your* packages may reach which. `from a.b import c`
+and `import a.b.c` both resolve dotted names against real files — a module or
+a package's `__init__.py`, whichever exists — and a relative import's leading
+dots climb exactly as many directories as they count, independent of how deep
+`from` nests. The standard library grant is a fixed list read out of `sys`
+across supported versions, not a per-repo guess, so `zone verify` never asks a
+contract to `use` `json` or `pathlib`: those names are not the repository's to
+grant, in any Python version the interpreter has shipped for years and will
+keep shipping.
+
 ## Build and Test
 
 Everything is cargo, except the parity gate:
@@ -512,8 +527,14 @@ this was rewritten from. It mutates each real contract the way a person breaks
 one; drop every seal, drop every guest list, squeeze the reach ceiling, revoke
 every variance, invert the entire stack; and requires both implementations to
 produce the same set of findings, law by law and file by file. It covers the six
-laws both implementations have; `use` postdates the rewrite and is pinned by
-`tests/fixtures/` instead.
+laws both implementations have; `use` postdates the rewrite and has no Python
+twin to check it against. `crates/zoning/tests/properties.rs` closes that gap
+with an independent oracle instead: `the_use_law_flags_exactly_the_outside_imports_no_grant_covers`
+grows randomized packages with real outside imports, drafts a randomized grant
+table over them, and hand-computes which imports should be refused —
+the same role `the_cycle_law_finds_what_a_slower_algorithm_finds` plays for
+`cycle` (Tarjan checked against an O(n³) fixed-point relaxation). `use` is
+pinned by fixtures *and* generative coverage now, not fixtures alone.
 
 Agreeing on a clean tree proves nothing, because every gate agrees that nothing
 is wrong.

@@ -1,0 +1,17 @@
+// The Python dialect's own demo: an absolute import into a zone, a relative
+// import within one, a standard-library import that needs no grant, and one
+// external dependency that does.
+package snake {
+    root     .
+    language python
+    facade   gate.py
+}
+
+zones {
+    core core/**
+}
+
+use vendorlib by gate.py
+
+limit  reach to 1 hops
+forbid cycles across directories

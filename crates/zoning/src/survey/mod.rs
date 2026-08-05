@@ -13,6 +13,7 @@
 
 mod dialect;
 mod prose;
+mod python;
 mod walk;
 mod zig;
 
@@ -148,13 +149,31 @@ impl Survey {
                 .collect();
         let judged: HashSet<&str> = admitted.iter().map(|(_, rel)| rel.as_str()).collect();
 
+        // Every top-level name this survey considers its own — the first path segment
+        // of a nested file, or the bare stem of one loose at the module root. Only a
+        // dialect whose import spelling is a module name rather than a path (Python)
+        // reads this; it is how such a dialect tells its own package from an external
+        // one that happens to share the same leading word.
+        let roots: Vec<&str> = {
+            let mut set: Vec<&str> = admitted
+                .iter()
+                .map(|(_, rel)| match rel.split_once('/') {
+                    Some((first, _)) => first,
+                    None => stem(rel, ask.dialect.extensions()),
+                })
+                .collect();
+            set.sort_unstable();
+            set.dedup();
+            set
+        };
+
         let (mut edges, mut escapes, mut skipped) = (Vec::new(), Vec::new(), 0);
         let mut outside = Vec::new();
         for (abs, src) in &admitted {
             let Ok(raw) = fs::read_to_string(abs) else { continue };
             let code = ask.dialect.prose().code_only(&raw);
             let lines = Lines::of(&raw);
-            for import in ask.dialect.imports(&raw, &code) {
+            for import in ask.dialect.imports(src, &roots, &raw, &code) {
                 let line = lines.at(import.offset);
                 let col = column(&raw, import.offset);
                 let width = raw[import.offset..]
@@ -182,6 +201,12 @@ impl Survey {
                     });
                     continue;
                 };
+                if dst == *src {
+                    // A file cannot architecturally depend on itself; a dialect whose
+                    // module name and file name can coincide (Python's package importing
+                    // its own top-level name from within) would otherwise draw one.
+                    continue;
+                }
                 if !judged.contains(dst.as_str()) {
                     skipped += 1;
                     continue;
@@ -276,6 +301,11 @@ impl Survey {
             .find(|(source, edge_line, _, _)| source == &path && *edge_line == line)
             .map_or((1, 1), |(_, _, col, width)| (col, width))
     }
+}
+
+/// A root-level file's own name, minus whichever of `extensions` it carries.
+fn stem<'a>(rel: &'a str, extensions: &[&str]) -> &'a str {
+    extensions.iter().find_map(|ext| rel.strip_suffix(&format!(".{ext}"))).unwrap_or(rel)
 }
 
 fn column(source: &str, offset: usize) -> usize {

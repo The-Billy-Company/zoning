@@ -22,6 +22,13 @@ pub struct Prose {
     pub line_string: Option<&'static str>,
     /// Quote characters that open a single-line literal, with backslash escapes.
     pub quotes: &'static [u8],
+    /// Multi-character literal delimiters that are allowed to hold a raw newline, as
+    /// Python's `"""`/`'''` do. Checked before `quotes`, so a triple quote is never
+    /// misread as an empty single-line literal followed by a stray one. A single-byte
+    /// `quotes` table cannot spell a three-byte delimiter, and unlike `quotes`, one of
+    /// these is expected to span lines — so it is blanked to its matching close (or to
+    /// the end of the file, unterminated) rather than cut off at the first `\n`.
+    pub triple_quotes: &'static [&'static str],
 }
 
 impl Prose {
@@ -44,6 +51,8 @@ impl Prose {
             } else if let Some(end) = self.block_at(&out, i) {
                 blank(&mut out, i, end);
                 i = end;
+            } else if let Some(delim) = self.triple_at(&out, i) {
+                i = blank_triple(&mut out, i, delim);
             } else if self.quotes.contains(&out[i]) {
                 i = blank_literal(&mut out, i);
             } else {
@@ -65,6 +74,30 @@ impl Prose {
             .map_or(buf.len(), |k| from + k + close.len());
         Some(end)
     }
+
+    fn triple_at(&self, buf: &[u8], i: usize) -> Option<&'static [u8]> {
+        self.triple_quotes.iter().map(|d| d.as_bytes()).find(|d| buf[i..].starts_with(d))
+    }
+}
+
+/// Blank a delimiter-quoted literal that is allowed to span lines; returns the index
+/// just past it. Unterminated blanks to end of file, matching every language that
+/// requires this delimiter to eventually close.
+fn blank_triple(buf: &mut [u8], i: usize, delim: &[u8]) -> usize {
+    let mut j = i + delim.len();
+    while j < buf.len() {
+        if buf[j] == b'\\' && j + 1 < buf.len() {
+            j += 2;
+        } else if buf[j..].starts_with(delim) {
+            let end = j + delim.len();
+            blank(buf, i, end);
+            return end;
+        } else {
+            j += 1;
+        }
+    }
+    blank(buf, i, buf.len());
+    buf.len()
 }
 
 /// Blank every line whose first non-blank content is the line-string prefix.
@@ -124,6 +157,15 @@ mod tests {
         block_comment: None,
         line_string: Some("\\\\"),
         quotes: b"\"'",
+        triple_quotes: &[],
+    };
+
+    const TRIPLE: Prose = Prose {
+        line_comment: "#",
+        block_comment: None,
+        line_string: None,
+        quotes: b"\"'",
+        triple_quotes: &["\"\"\"", "'''"],
     };
 
     fn blanked(text: &str) -> String {
@@ -155,5 +197,27 @@ mod tests {
     fn multibyte_prose_costs_its_own_width() {
         let src = "// … an ellipsis\nconst x = 1;\n";
         assert_eq!(blanked(src).len(), src.len());
+    }
+
+    #[test]
+    fn a_triple_quote_spans_lines_and_preserves_offsets() {
+        let src = "x = \"\"\"\nimport os\n\"\"\"\nimport sys\n";
+        let out = String::from_utf8(TRIPLE.code_only(src)).expect("blanking yields spaces");
+        assert_eq!(out.len(), src.len(), "byte offsets must not move");
+        assert_eq!(out.matches("import").count(), 1, "only the real import survives");
+    }
+
+    #[test]
+    fn a_lone_quote_inside_a_triple_quote_does_not_close_it() {
+        let src = "x = '''a \" quote and a ' quote'''\nimport sys\n";
+        let out = String::from_utf8(TRIPLE.code_only(src)).expect("blanking yields spaces");
+        assert_eq!(out.matches("import").count(), 1);
+    }
+
+    #[test]
+    fn an_unterminated_triple_quote_blanks_to_end_of_file() {
+        let out = String::from_utf8(TRIPLE.code_only("x = \"\"\"\nnever closed\n"))
+            .expect("blanking yields spaces");
+        assert!(!out.contains("closed"), "the open literal must swallow the rest: {out}");
     }
 }

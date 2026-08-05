@@ -102,6 +102,19 @@ fn an_import_named_only_in_a_comment_or_a_string_is_not_an_import() {
 }
 
 #[test]
+fn a_second_dialect_is_read_and_judged_through_the_same_pipeline() {
+    // `pass/snake` declares `language python` itself, overriding the `zig()`
+    // fallback `fixture` passes every other case — proof the contract's own word
+    // wins, not a special path for this test. It exercises an absolute import into
+    // a zone, a relative import within one, a standard-library import that needs
+    // no grant, and one external dependency that does.
+    let (ordinance, survey) = fixture("pass", "snake");
+    assert_eq!(ordinance.dialect.name(), "python");
+    let found = judge::judge(&survey, &ordinance);
+    assert!(found.ok(), "expected clean, got {:?}", laws(&found));
+}
+
+#[test]
 fn each_law_fires_on_the_fixture_built_to_break_it() {
     for (fixture, expected) in [
         ("uphill", Law::Zone),
@@ -295,7 +308,7 @@ fn discovery_finds_every_fixture_and_ignores_the_rest() {
         .iter()
         .filter_map(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
         .collect();
-    for expected in ["layered", "prose", "uphill", "bypass", "trespass", "knot", "stale"] {
+    for expected in ["layered", "prose", "snake", "uphill", "bypass", "trespass", "knot", "stale"] {
         assert!(names.contains(&expected.to_owned()), "discovery missed {expected}: {names:?}");
     }
     assert!(found.iter().all(|p| p.extension() == Some(Path::new("zone").as_os_str())));
