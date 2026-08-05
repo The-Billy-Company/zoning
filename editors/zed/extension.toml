@@ -2,13 +2,13 @@ id = "zoning"
 name = "Zoning"
 version = "1.0.0"
 schema_version = 1
-authors = ["Griffin Strier <griffin@billylives.com>"]
+authors = [ "Griffin Strier <griffin@billylives.com>" ]
 description = "Architecture contracts and language intelligence for .zone files."
 repository = "https://github.com/The-Billy-Company/zoning"
 
 [language_servers.zoning]
 name = "Zoning Language Server"
-languages = ["Zoning"]
+languages = [ "Zoning" ]
 
 [grammars.zoning]
 repository = "https://github.com/The-Billy-Company/zoning"

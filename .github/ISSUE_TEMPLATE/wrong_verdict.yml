@@ -1,0 +1,81 @@
+name: Wrong verdict
+description: zoning blocked legitimate code, or let a real violation through.
+title: "verdict: "
+labels: ["topic/verdict"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        This gate is wired into CI to decide whether a change merges, so a
+        wrong verdict matters more than a slow one. This is the form for that.
+
+
+        If a hostile `.zone` file or a crafted import graph could produce
+        what you saw - a real violation that verifies clean, in particular -
+        treat it as a security report and file it privately:
+        [SECURITY.md](https://github.com/The-Billy-Company/zoning/blob/main/SECURITY.md).
+
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Which way is it wrong?
+      options:
+        - False positive - legitimate code was blocked
+        - False negative - a real violation verified clean
+    validations:
+      required: true
+
+  - type: dropdown
+    id: law
+    attributes:
+      label: Which law
+      options:
+        - "`zone` - an import points up the stack"
+        - "`seal` - an import reaches past a sealed directory's entry file"
+        - "`keep` - an importer not on the guest list reaches a kept region"
+        - "`cycle` - an import cycle crosses a directory boundary"
+        - "`reach` - an import climbs more `../` than the ceiling allows"
+        - "`escape` - an import climbs out of the module root entirely"
+        - "`use` - a zone imports an outside module no grant covers"
+        - Not sure / something else (glob matching, contract parsing, coverage)
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: The `.zone` contract
+      description: The relevant zones/seals/keeps/grants - the whole file if it's short.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: The command
+      description: Exactly as run, from the directory it was run in.
+      render: shell
+      placeholder: |
+        zoning verify --complete
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it said, and what it should have said
+      description: >-
+        The output, and then the specific import or file that's wrong. Name
+        the exact path and line; "the graph looks incomplete" is not
+        something we can chase.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "`zoning --version`"
+    validations:
+      required: true

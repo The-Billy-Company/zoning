@@ -1,0 +1,46 @@
+{
+  "_meta": [
+    "editorconfig-checker enforces the file-shape contract in .editorconfig.",
+    "Language formatters own exact indentation and wrapping; this gate owns",
+    "line endings, indentation kind, final newlines, trailing space, and UTF-8.",
+    "Markdown is excluded because two trailing spaces are a hard line break -",
+    "the file itself says so. Generated and vendored bytes are somebody else's.",
+    "The `host` fixture commits a real `.zig-cache/` to exercise `--untracked`",
+    "against a tree that has one - opaque, sometimes-binary build-cache bytes,",
+    "not authored content. `tree-sitter generate` writes grammar.json and",
+    "node-types.json without the trailing newline `.editorconfig` wants, and",
+    "reformatting the CLI's own output would just be undone by its next run."
+  ],
+  "Verbose": false,
+  "Debug": false,
+  "IgnoreDefaults": false,
+  "SpacesAfterTabs": false,
+  "NoColor": false,
+  "Exclude": [
+    "/target/",
+    "/\\.venv/",
+    "/dist/",
+    "node_modules/",
+    "\\.png$",
+    "\\.svg$",
+    "\\.md$",
+    "\\.vsix$",
+    "Cargo\\.lock$",
+    "/\\.zig-cache/",
+    "/zig-out/",
+    "/zig-pkg/",
+    "editors/zed/grammar/src/grammar\\.json$",
+    "editors/zed/grammar/src/node-types\\.json$"
+  ],
+  "AllowedContentTypes": [],
+  "PassedFiles": [],
+  "Disable": {
+    "EndOfLine": false,
+    "Indentation": false,
+    "IndentSize": true,
+    "InsertFinalNewline": false,
+    "TrimTrailingWhitespace": false,
+    "MaxLineLength": true,
+    "Charset": false
+  }
+}

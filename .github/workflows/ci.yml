@@ -202,6 +202,47 @@ jobs:
       - run: uv run --no-project --with zizmor==1.29.0 zizmor --no-online-audits --strict-collection .
       - uses: docker://rhysd/actionlint:1.7.7
 
+  # Prose, manifests, and the two owned Python utility scripts are one kind of
+  # news: the repository's authored surface stopped obeying its checked-in
+  # contracts. This stays separate from every build job because none of these
+  # checks needs a Rust toolchain; compiling first would spend a minute
+  # without making the verdict any stronger.
+  #
+  # Python-distributed tools run through uv's isolated no-project environment
+  # so a version bump is a diff here rather than an image update silently
+  # changing what passes. `.github/scripts/triage.py` is deliberately outside
+  # this job's Ruff scope - it is kept byte-identical with four sibling
+  # repositories (`triage.py peers` proves it), and each of those repositories
+  # already lints their own copy under their own Ruff configuration.
+  discipline:
+    name: discipline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Markdown structure and layout
+        uses: DavidAnson/markdownlint-cli2-action@6bf21b07787794f89a243495939cd651942aeabe # v24.1.0
+        with:
+          globs: "**/*.md"
+      - name: Authored spelling
+        uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.48.0
+      - name: YAML structure
+        run: uv run --no-project --with yamllint==1.38.0 yamllint .github
+      - name: TOML format and schemas
+        run: |
+          uv run --no-project --with taplo==0.9.3 taplo fmt --check
+          uv run --no-project --with taplo==0.9.3 taplo lint
+      - name: EditorConfig conformance
+        run: uv run --no-project --with editorconfig-checker==3.8.0 ec
+      - name: Python lint and format
+        run: |
+          uv run --no-project --with ruff==0.16.1 ruff check tools/differential.py editors/vscode/scripts/deterministic.py
+          uv run --no-project --with ruff==0.16.1 ruff format --check tools/differential.py editors/vscode/scripts/deterministic.py
+      - name: Shell correctness
+        run: git ls-files -z '*.sh' '.githooks/pre-push' | xargs -0 uv run --no-project --with shellcheck-py==0.11.0.1 shellcheck
+
   # Fragment names/types/bodies parse, and towncrier's own draft render is
   # non-vacuous — proven on every PR rather than discovered at tag time, when
   # a malformed `changelog.d/` entry is far more expensive to fix.
@@ -244,7 +285,7 @@ jobs:
   # upstream failed, which is exactly the case it has to report on.
   release-ready:
     if: always()
-    needs: [check, dogfood, portability, wheel, editors, actions, msrv, changelog]
+    needs: [check, dogfood, portability, wheel, editors, actions, discipline, msrv, changelog]
     runs-on: ubuntu-latest
     steps:
       - name: every required job is green

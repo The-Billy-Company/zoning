@@ -1,0 +1,70 @@
+name: Feature request
+description: Something the gate should be able to declare or judge and cannot.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        The seven laws (`zone` `seal` `keep` `cycle` `reach` `escape` `use`)
+        are closed on purpose - a boundary language whose vocabulary grows
+        per project stops being a language and becomes a config file. A
+        request for an eighth law has to argue the compiler structurally
+        cannot enforce what it wants, the way each of the seven already does.
+
+
+        A request for a new *language* is a different, usually easier ask -
+        see [Languages](https://github.com/The-Billy-Company/zoning#languages)
+        for what a `Dialect` needs to supply.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to declare or catch
+      description: >-
+        The architectural claim you want a `.zone` file to make, not the
+        syntax you have in mind. "This directory may only be entered through
+        its front door" is the kind of claim that produced `seal`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do instead today
+      description: >-
+        A code review convention, a comment, a different tool, a variance
+        that's really standing in for a missing law. This is the strongest
+        evidence a request has.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: >-
+        A stanza in the language, a new verb, a flag. Rough is fine. If you
+        know what it should do at the edges - a single-file module, a
+        vendored dependency, an empty package - say it, because that is where
+        the design work actually is.
+
+  - type: dropdown
+    id: home
+    attributes:
+      label: Where does this belong?
+      options:
+        - Here - it's a claim about how files sit relative to each other in one package
+        - It's a new Dialect (a language zoning doesn't read yet)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: prior_art
+    attributes:
+      label: Who already does this?
+      description: >-
+        import-linter, ArchUnit, `go vet`, a paper. Not a disqualification -
+        the opposite. Knowing that someone solved it, and how, is where a good
+        design starts.

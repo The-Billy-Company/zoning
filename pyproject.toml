@@ -9,7 +9,7 @@
 # neither is a reimplementation that can drift from the other.
 
 [build-system]
-requires = ["maturin>=1.9,<2.0"]
+requires = [ "maturin>=1.9,<2.0" ]
 build-backend = "maturin"
 
 [project]
@@ -17,9 +17,9 @@ name = "zoning"
 description = "An import-topology gate: declare the zones a package's imports may cross, and judge the real import graph against them."
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
-authors = [{ name = "Griffin Strier", email = "griffin@billylives.com" }]
-keywords = ["architecture", "lint", "imports", "dependencies", "zig"]
+license-files = [ "LICENSE", "NOTICE" ]
+authors = [ { name = "Griffin Strier", email = "griffin@billylives.com" } ]
+keywords = [ "import-topology", "static-analysis", "architecture", "linter", "zig" ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -31,7 +31,7 @@ classifiers = [
 # The wheel ships a compiled binary and imports nothing, so it needs no runtime
 # Python beyond an interpreter new enough for `uvx` to resolve the wheel tag.
 requires-python = ">=3.9"
-dynamic = ["version"]
+dynamic = [ "version" ]
 
 [project.urls]
 Homepage = "https://github.com/The-Billy-Company/zoning"

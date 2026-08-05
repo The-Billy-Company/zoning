@@ -1,0 +1,25 @@
+# Who gets asked to review what.
+#
+# GitHub matches the LAST rule that applies to a file, so the specific rules
+# live below the catch-all. Ownership here is a routing table, not a fence: a
+# pull request from anyone is welcome on any of these paths.
+
+*                       @GriffinCanCode
+
+# The judge itself - the parser, the seven laws, the reports, the CLI.
+/crates/                @GriffinCanCode
+
+# Parity and fixtures. A weakened gate is worse than an absent one, because it
+# looks like evidence.
+/tests/                 @GriffinCanCode
+/tools/                 @GriffinCanCode
+
+# Distribution: what lands on someone's PATH and in their editor.
+/editors/               @GriffinCanCode
+/pyproject.toml         @GriffinCanCode
+
+/NOTICE                 @GriffinCanCode
+/LICENSE                @GriffinCanCode
+
+# Anything that can change what CI proves, including this file.
+/.github/               @GriffinCanCode

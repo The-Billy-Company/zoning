@@ -11,6 +11,10 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
+# The editor payloads: editors/vscode and editors/zed/grammar each resolve
+# their own npm tree.
+node_modules/
+
 # Toolchain overrides for one machine. `.mise.toml` is tracked; this is the
 # per-checkout escape hatch and nobody else's business.
 mise.local.toml

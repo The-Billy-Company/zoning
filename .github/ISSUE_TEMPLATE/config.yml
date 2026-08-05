@@ -1,0 +1,14 @@
+# Blank issues are off, not to be difficult, but because the forms beside this
+# file ask for the things that decide whether a report is actionable: the exact
+# command line, the `.zone` contract, and a tree we can rebuild. "It gave the
+# wrong verdict" without those is a report nobody can reproduce.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/The-Billy-Company/zoning/security/advisories/new
+    about: >-
+      Never in a public issue. This opens a private thread only the
+      maintainers can read. SECURITY.md says what counts here - a real
+      violation that verifies clean is the highest-severity class of bug this
+      project has.

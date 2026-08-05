@@ -1,0 +1,69 @@
+name: Bug report
+description: A crash, a hang, a build failure, a broken flag, or setup/LSP misbehavior.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        If the complaint is that a *verdict* is wrong - a violation that
+        verified clean, or legitimate code that got blocked - the other form
+        asks better questions than this one; use that instead.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: >-
+        The command line exactly as run, and the `.zone` contract plus a
+        minimal source tree if the tree matters. A reproduction we can paste
+        into a terminal is worth ten paragraphs of description.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output, error, or stack trace
+      description: The whole thing, not the last line - stderr included.
+      render: text
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - running a verb (verify / status / list / show / map / explain / draft)
+        - reading or parsing a `.zone` contract
+        - the language server (`zoning lsp --stdio`)
+        - first-run editor setup (`zoning setup {status,run,repair,uninstall}`)
+        - an editor payload (VS Code / Zed / Vim / Neovim)
+        - the crates.io binary or the PyPI wheel itself
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "`zoning --version`"
+      description: Or the commit SHA if you built it yourself.
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS, architecture, and how you installed it (cargo / uv / pipx / source).
+      placeholder: "Ubuntu 24.04 x86_64, installed via cargo install zoning"
+    validations:
+      required: true

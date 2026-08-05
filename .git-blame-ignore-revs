@@ -1,0 +1,7 @@
+# git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Add full commit SHAs for tree-wide formatter or migration commits below.
+# Blame can then step through mechanical reflow to the change that meant it.
+#
+# Empty on purpose. zoning is young enough that no commit yet is pure
+# mechanical reflow with nothing worth reading in the diff.

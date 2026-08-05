@@ -15,8 +15,8 @@ version_kind = "cargo-workspace"
 [changelog]
 directory = "changelog.d"
 file = "CHANGELOG.md"
-ignore = [".gitkeep", "README.md", ".markdownlint-cli2.jsonc"]
-types = ["added", "changed", "deprecated", "removed", "fixed", "security"]
+ignore = [ ".gitkeep", "README.md" ]
+types = [ "added", "changed", "deprecated", "removed", "fixed", "security" ]
 stem_pattern = '^\+[a-z0-9]+(-[a-z0-9]+)*$'
 min_body_chars = 40
 

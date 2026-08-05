@@ -1,0 +1,46 @@
+# Spellcheck authored source and prose. Fixtures under tests/ are deliberately
+# malformed in places - that's the point of a `fail` box - and dist/ and lock
+# files are somebody else's bytes.
+[files]
+extend-exclude = [
+  "*.lock",
+  "dist/**",
+  "editors/*/node_modules/**",
+  "editors/vscode/dist/**",
+]
+
+[default]
+locale = "en-us"
+extend-ignore-identifiers-re = [
+  "^[A-Za-z0-9]{20,}$",
+]
+
+[default.extend-words]
+# The project name and its own vocabulary.
+zoning = "zoning"
+maturin = "maturin"
+uvx = "uvx"
+pipx = "pipx"
+Tarjan = "Tarjan"
+ward = "ward"
+seddonym = "seddonym"
+# Import-topology and glob terms the tokenizer mistakes for prose.
+globset = "globset"
+globbing = "globbing"
+translate = "translate"
+# Prose here is written in British English throughout - narrowing the
+# lexicon rather than weakening the locale, same as the other three repos.
+neighbour = "neighbour"
+memorise = "memorise"
+behaviours = "behaviours"
+labour = "labour"
+colour = "colour"
+analysing = "analysing"
+analyse = "analyse"
+reorganises = "reorganises"
+recognises = "recognises"
+judgement = "judgement"
+# A valid alternate spelling this codebase's own error variant uses.
+unparseable = "unparseable"
+# The vim modeline option for "no expandtab", not a misspelling of "note".
+noet = "noet"

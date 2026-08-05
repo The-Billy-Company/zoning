@@ -1,0 +1,52 @@
+# How git should treat the bytes in this repository.
+#
+# Three jobs: keep line endings from becoming a diff, keep generated files out
+# of review and out of GitHub's language stats, and give git the hunk-header
+# rules that make a diff readable.
+
+# ── Line endings ────────────────────────────────────────────────────────────
+# Normalize on commit, LF in the working tree on every platform - including
+# Windows, which `portability` and `wheel` build and test natively.
+* text=auto eol=lf
+
+# ── Binary ──────────────────────────────────────────────────────────────────
+# The README figures and the SVG file-identity assets under assets/.
+*.png binary
+
+# ── Generated ───────────────────────────────────────────────────────────────
+# The VS Code extension's packaged VSIX, checked in because the setup payload
+# it embeds must match what CI's `editors` job just built - `git diff
+# --exit-code` on that file IS the check. Reviewed as a fact ("this changed"),
+# never read byte by byte.
+crates/zoning/src/setup/payload/zoning.vsix linguist-generated -diff
+
+# Lockfiles: resolver output. Reviewed as a fact ("this version moved"), never
+# read line by line.
+*.lock linguist-generated -diff
+uv.lock linguist-generated -diff
+
+# ── Apparatus ───────────────────────────────────────────────────────────────
+# Code that operates or measures this project, rather than being it.
+# `linguist-detectable=false` drops it from the language breakdown only - it
+# stays in the tree, in review, in diffs, and in the tarball GitHub renders
+# for a tag.
+tools/**    linguist-detectable=false
+.github/**  linguist-detectable=false
+
+# NOT excluded, deliberately. crates/ is the judge itself and editors/ is four
+# shipped editor integrations - both are the product, and JavaScript in
+# editors/vscode and editors/zed/grammar is a true statement about what this
+# repository offers, not apparatus to hide.
+
+# ── Diff drivers ────────────────────────────────────────────────────────────
+# Git ships a hunk-header pattern for Rust and Markdown; naming them here is
+# what makes `@@ ... fn whatever` appear above a hunk instead of a bare line
+# number.
+*.rs  diff=rust
+*.md  diff=markdown
+
+# ── Merge ───────────────────────────────────────────────────────────────────
+# The changelog is append-at-the-top and assembled by towncrier. Two branches
+# adding release sections conflict textually while agreeing semantically; a
+# union merge keeps both and lets the next `towncrier build` sort it out.
+CHANGELOG.md merge=union

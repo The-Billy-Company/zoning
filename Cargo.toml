@@ -1,9 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/zoning"]
+members = [ "crates/zoning" ]
 
 [workspace.package]
-version = "1.0.0"                                                                 # x-release-please-version
+version = "1.0.0" # x-release-please-version
 edition = "2024"
 # 1.88 is where `let` chains stabilized. Three of them read better than the
 # nested `if`s they replace, and a floor a year old is not a barrier for a
@@ -12,9 +12,9 @@ rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/The-Billy-Company/zoning"
 homepage = "https://github.com/The-Billy-Company/zoning"
-authors = ["Griffin Strier <griffin@billylives.com>"]
-keywords = ["architecture", "lint", "imports", "dependencies", "zig"]
-categories = ["development-tools", "development-tools::build-utils"]
+authors = [ "Griffin Strier <griffin@billylives.com>" ]
+keywords = [ "import-topology", "static-analysis", "architecture", "linter", "zig" ]
+categories = [ "development-tools", "development-tools::build-utils" ]
 
 [workspace.lints.rust]
 missing_docs = "warn"

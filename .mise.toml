@@ -1,0 +1,44 @@
+# The Setup table in CONTRIBUTING.md, made executable:
+#
+#     mise install
+#
+# What each row mirrors, and what it does not. `1.88` tracks `rust-version`
+# in Cargo.toml, checked by the `msrv` job - bump one and bump the other in
+# the same commit. `stable` mirrors what `check`/`dogfood`/`portability`/
+# `wheel`/`editors`/`soak` actually build against: `dtolnay/rust-toolchain`
+# resolves `toolchain: stable` fresh on every run rather than reading a pinned
+# channel file, so this row floats the same way on purpose - a fixed number
+# here would just be a stale opinion about what "stable" meant last time
+# somebody looked. uv and node have no pinned authority in CI either - the
+# `wheel` job's `setup-uv` step and the `editors` job's runner both take
+# whatever the image ships - so these two rows exist purely so `mise install`
+# gives a contributor a deterministic default rather than "whatever happened
+# to be on your machine."
+min_version = "2026.4.0"
+
+[tools]
+rust = [ "stable", "1.88" ]
+"ubi:astral-sh/uv" = "0.11.16"
+node = "22"
+
+# Deliberately absent: ruff, yamllint, taplo, editorconfig-checker, zizmor,
+# typos, markdownlint-cli2. CI installs each with
+# `uv run --no-project --with <pkg>==<version>` (or a pinned Action for
+# markdownlint), and CONTRIBUTING tells you to type the same line - so the
+# workflow already IS the version authority. A second pin here could only
+# disagree with it.
+
+[settings]
+# mise.lock is committed, so a contributor and CI resolve the same bytes.
+# mise.local.toml and mise.local.lock stay gitignored for machine overrides.
+lockfile = true
+lockfile_platforms = [ "macos-arm64", "macos-x64", "linux-x64", "linux-arm64" ]
+
+# Both are defaults today. Pinned anyway, because this repo ships prebuilt
+# binaries and a stray global config turning provenance checks off should not
+# be possible without editing this file.
+slsa = true
+github_attestations = true
+
+# A bare `mise use <tool>` writes the exact resolved version, never a range.
+pin = true

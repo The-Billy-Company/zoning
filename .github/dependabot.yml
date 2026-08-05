@@ -1,0 +1,80 @@
+# Automated dependency updates.
+#
+# Four manifests, three package ecosystems, one weekly window. The judge itself
+# is std-only and stays that way; what moves here is the LSP dependency set
+# (crates/zoning), and the two editor payloads that carry their own npm/cargo
+# graphs (editors/vscode, editors/zed).
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+    labels: ["type/deps", "area/ci"]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      rust:
+        patterns: ["*"]
+    commit-message:
+      prefix: "build"
+    labels: ["type/deps", "lang/rust"]
+    cooldown:
+      default-days: 7
+
+  # The extension's own crate - a standalone workspace, not a member of the
+  # root one, so it needs its own directory.
+  - package-ecosystem: cargo
+    directory: /editors/zed
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      zed-extension:
+        patterns: ["*"]
+    commit-message:
+      prefix: "build"
+    labels: ["type/deps", "area/editors", "lang/rust"]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: npm
+    directory: /editors/vscode
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      vscode:
+        patterns: ["*"]
+    commit-message:
+      prefix: "build"
+    labels: ["type/deps", "area/editors", "lang/js"]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: npm
+    directory: /editors/zed/grammar
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      zed-grammar:
+        patterns: ["*"]
+    commit-message:
+      prefix: "build"
+    labels: ["type/deps", "area/editors", "lang/js"]
+    cooldown:
+      default-days: 7

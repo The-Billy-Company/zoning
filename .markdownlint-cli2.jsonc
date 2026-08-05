@@ -1,8 +1,25 @@
-// Markdown discipline, read by `.githooks/pre-push` and by any editor with
-// markdownlint installed. The hook looks for this file by name in the commit it
-// is pushing, so the rules travel with the bytes they judge rather than living
-// in somebody's local settings.
 {
+  // Markdown discipline, read by `.githooks/pre-push` and by any editor with
+  // markdownlint installed. The hook looks for this file by name in the commit
+  // it is pushing, so the rules travel with the bytes they judge rather than
+  // living in somebody's local settings. `gitignore: true` plus the explicit
+  // entries below keep `target/`, `node_modules/`, and `dist/` out of a direct
+  // invocation the same way they're already out of the tracked tree.
+  "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.23.0/schema/markdownlint-cli2-config-schema.json",
+  "gitignore": true,
+  "globs": ["**/*.md"],
+  "ignores": [
+    "**/target/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.venv/**",
+    // towncrier assembles this one from changelog.d, and the fragments it
+    // consumes are deleted at release. So a style fix applied here can never
+    // reach the thing that wrote it, and the next release re-imports whatever
+    // the new fragments happened to use. Lint the source instead: the glob
+    // above already covers changelog.d/*.md, which is where news is authored.
+    "CHANGELOG.md"
+  ],
   "config": {
     // Prose wraps near 80 and the code in this repo is formatted to 100
     // (`rustfmt.toml`), so 100 is the honest ceiling for a document that quotes
@@ -17,6 +34,9 @@
     // Every unlabelled fence here holds either a `.zone` contract or terminal
     // output. Neither has a highlighter, and `text` would assert only that no
     // highlighter exists - which is what a bare fence already says.
-    "MD040": false
+    "MD040": false,
+    // Towncrier fragments and the pull request template are document parts,
+    // not standalone pages; requiring an H1 would corrupt their rendered form.
+    "MD041": false
   }
 }

@@ -55,7 +55,9 @@ def mutations(text: str) -> dict[str, str]:
 
     # Squeeze the reach ceiling until real imports exceed it.
     for hops in (1, 2):
-        squeezed = re.sub(r"(?m)^limit\s+reach to \d+ hops$", f"limit  reach to {hops} hops", text)
+        squeezed = re.sub(
+            r"(?m)^limit\s+reach to \d+ hops$", f"limit  reach to {hops} hops", text
+        )
         if squeezed != text:
             out[f"reach-{hops}"] = squeezed
 
@@ -68,7 +70,11 @@ def mutations(text: str) -> dict[str, str]:
     zones = re.search(r"(?ms)^zones \{\n(.*?)^\}", text)
     if zones:
         body = zones.group(1)
-        rows = [ln for ln in body.splitlines() if ln.strip() and not ln.strip().startswith("//")]
+        rows = [
+            ln
+            for ln in body.splitlines()
+            if ln.strip() and not ln.strip().startswith("//")
+        ]
         if len(rows) > 1:
             flipped = body.replace("\n".join(rows), "\n".join(reversed(rows)))
             out["inverted"] = text[: zones.start(1)] + flipped + text[zones.end(1) :]
@@ -91,9 +97,16 @@ def unrename(text: str) -> str:
     return re.sub(r"(?m)^variance ", "allow ", text)
 
 
-def findings(argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> set[tuple]:
+def findings(
+    argv: list[str], cwd: Path, env: dict[str, str] | None = None
+) -> set[tuple]:
     done = subprocess.run(
-        argv, cwd=cwd, capture_output=True, text=True, env={**os.environ, **(env or {})}, check=False
+        argv,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env={**os.environ, **(env or {})},
+        check=False,
     )
     if done.returncode == 2:
         return {("INVOCATION-FAILED", done.stderr.strip()[:200])}
@@ -104,7 +117,11 @@ def findings(argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
     # `tier` was renamed `zone` in the rewrite; the law is the same law.
     renamed = {"tier": "zone", "allow": "variance"}
     return {
-        (renamed.get(r.get("law"), r.get("law")), r.get("file", ""), r.get("subject", ""))
+        (
+            renamed.get(r.get("law"), r.get("law")),
+            r.get("file", ""),
+            r.get("subject", ""),
+        )
         for r in rows
     }
 
@@ -112,7 +129,9 @@ def findings(argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--python", default=sys.executable)
-    ap.add_argument("--ward", required=True, help="directory containing the `ward` package")
+    ap.add_argument(
+        "--ward", required=True, help="directory containing the `ward` package"
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 

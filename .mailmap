@@ -1,0 +1,14 @@
+# One identity per person, however git happened to be configured that day.
+#
+# This file only changes what git *reports* - `git shortlog -sne`, `git blame`,
+# `git log --use-mailmap`, and the contributor list GitHub renders. It rewrites
+# no history and no commit object.
+#
+# Left of the second `<...>` is the canonical identity; right of it is the
+# spelling found in history. Add a line rather than asking anyone to rewrite a
+# commit.
+#
+# Format: Proper Name <proper@email> <commit@email>
+# See `git help shortlog` (MAPPING AUTHORS).
+
+Griffin Strier <griffin@billylives.com> <griffin@billylives.com>
