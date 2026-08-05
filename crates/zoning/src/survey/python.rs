@@ -118,8 +118,19 @@ impl Dialect for Python {
         &PROSE
     }
 
-    fn imports(&self, path: &str, roots: &[&str], _source: &str, code: &[u8]) -> Vec<Import> {
+    fn imports(
+        &self,
+        path: &str,
+        roots: &[&str],
+        own: &str,
+        _source: &str,
+        code: &[u8],
+    ) -> Vec<Import> {
         let depth = depth_of(path);
+        // Hyphen and underscore are the same package to a human, but only one of
+        // them can appear in an identifier — a manifest's `my-package` is always
+        // spelled `import my_package` in code, never with the hyphen.
+        let own = own.replace('-', "_");
         let mut out = Vec::new();
         let mut i = 0;
         while i < code.len() {
@@ -131,11 +142,11 @@ impl Dialect for Python {
                 continue;
             }
             if from_at == Some(at) {
-                let (found, end) = parse_from(code, roots, depth, at);
+                let (found, end) = parse_from(code, roots, &own, depth, at);
                 out.extend(found);
                 i = end;
             } else {
-                let (found, end) = parse_plain(code, roots, depth, at);
+                let (found, end) = parse_plain(code, roots, &own, depth, at);
                 out.extend(found);
                 i = end;
             }
@@ -159,7 +170,13 @@ impl Dialect for Python {
 
 /// `from <dots><module>? import <names>` — `at` is the byte offset of `from`.
 /// Returns the imports it read and the offset just past the statement.
-fn parse_from(code: &[u8], roots: &[&str], depth: usize, at: usize) -> (Vec<Import>, usize) {
+fn parse_from(
+    code: &[u8],
+    roots: &[&str],
+    own: &str,
+    depth: usize,
+    at: usize,
+) -> (Vec<Import>, usize) {
     let mut j = at + 4;
     if !matches!(code.get(j), Some(b' ' | b'\t')) {
         return (Vec::new(), at + 4);
@@ -169,7 +186,7 @@ fn parse_from(code: &[u8], roots: &[&str], depth: usize, at: usize) -> (Vec<Impo
     j += dots;
     let mod_start = j;
     j = skip_dotted(code, j);
-    let module = std::str::from_utf8(&code[mod_start..j]).unwrap_or("");
+    let mut module = std::str::from_utf8(&code[mod_start..j]).unwrap_or("");
     j = skip_h(code, j);
     let Some(k) = find_word(code, b"import", j) else { return (Vec::new(), at + 4) };
     if code[j..k].iter().any(|&b| !matches!(b, b' ' | b'\t' | b'\n')) {
@@ -180,12 +197,19 @@ fn parse_from(code: &[u8], roots: &[&str], depth: usize, at: usize) -> (Vec<Impo
 
     let mut out = Vec::new();
     if dots == 0 {
-        let top = module.split('.').next().unwrap_or("");
-        if top.is_empty() || !roots.contains(&top) {
-            if !top.is_empty() {
-                out.push(spec(at, top.to_owned()));
+        if self_ref(module, roots, own) {
+            // `from acme.contracts import X`, read from inside `acme` itself: the
+            // leading segment names this package's own top level rather than a
+            // subdirectory, so it contributes no path segment.
+            module = strip_own(module, own);
+        } else {
+            let top = module.split('.').next().unwrap_or("");
+            if top.is_empty() || !roots.contains(&top) {
+                if !top.is_empty() {
+                    out.push(spec(at, top.to_owned()));
+                }
+                return (out, end);
             }
-            return (out, end);
         }
     }
     let climbs = if dots == 0 { depth } else { dots - 1 };
@@ -211,7 +235,13 @@ fn parse_from(code: &[u8], roots: &[&str], depth: usize, at: usize) -> (Vec<Impo
 
 /// `import <dotted>[ as alias][, <dotted>[ as alias]]*` — `at` is the byte offset of
 /// `import`. Returns the imports it read and the offset just past the statement.
-fn parse_plain(code: &[u8], roots: &[&str], depth: usize, at: usize) -> (Vec<Import>, usize) {
+fn parse_plain(
+    code: &[u8],
+    roots: &[&str],
+    own: &str,
+    depth: usize,
+    at: usize,
+) -> (Vec<Import>, usize) {
     let start = at + 6;
     let eol = code[start..]
         .iter()
@@ -228,16 +258,47 @@ fn parse_plain(code: &[u8], roots: &[&str], depth: usize, at: usize) -> (Vec<Imp
         if dotted.is_empty() {
             continue;
         }
-        let top = dotted.split('.').next().unwrap_or("");
-        if !roots.contains(&top) {
-            out.push(spec(at, top.to_owned()));
-            continue;
+        let dotted = if self_ref(dotted, roots, own) {
+            strip_own(dotted, own) // `import acme.contracts`, from inside `acme`
+        } else {
+            let top = dotted.split('.').next().unwrap_or("");
+            if !roots.contains(&top) {
+                out.push(spec(at, top.to_owned()));
+                continue;
+            }
+            dotted
+        };
+        let prefix = "../".repeat(depth);
+        let dir = if dotted.is_empty() {
+            prefix.trim_end_matches('/').to_owned()
+        } else {
+            format!("{prefix}{}", dotted.replace('.', "/"))
+        };
+        if !dotted.is_empty() {
+            out.push(spec(at, format!("{dir}.py")));
         }
-        let target = format!("{}{}", "../".repeat(depth), dotted.replace('.', "/"));
-        out.push(spec(at, format!("{target}.py")));
-        out.push(spec(at, format!("{target}/__init__.py")));
+        out.push(spec(at, format!("{dir}/__init__.py")));
     }
     (out, eol)
+}
+
+/// Does `module` (an absolute, dot-free-leading spelling) name this package's own
+/// top level rather than a subdirectory `roots` already knows about?
+///
+/// Guarded by `!roots.contains(&own)` so a package that genuinely has a
+/// subdirectory of its own name — the ordinary nested layout — keeps taking the
+/// path `roots` already resolves correctly; this only fires for the flat layout
+/// `roots` cannot see into, where the package's declared name has no directory of
+/// its own to be.
+fn self_ref(module: &str, roots: &[&str], own: &str) -> bool {
+    !own.is_empty()
+        && !roots.contains(&own)
+        && (module == own || module.strip_prefix(own).is_some_and(|rest| rest.starts_with('.')))
+}
+
+/// `module` with its leading `own` (and the dot after it, if any) removed.
+fn strip_own<'a>(module: &'a str, own: &str) -> &'a str {
+    module.get(own.len()..).unwrap_or("").trim_start_matches('.')
 }
 
 fn spec(offset: usize, spec: String) -> Import {
@@ -462,8 +523,12 @@ mod tests {
     use super::*;
 
     fn specs(path: &str, roots: &[&str], source: &str) -> Vec<String> {
+        owned_specs(path, roots, "", source)
+    }
+
+    fn owned_specs(path: &str, roots: &[&str], own: &str, source: &str) -> Vec<String> {
         let code = PROSE.code_only(source);
-        Python.imports(path, roots, source, &code).into_iter().map(|i| i.spec).collect()
+        Python.imports(path, roots, own, source, &code).into_iter().map(|i| i.spec).collect()
     }
 
     #[test]
@@ -574,6 +639,88 @@ import fake.one
 # import fake.two
 import real\n";
         assert_eq!(specs("mod.py", &[], src), ["real"]);
+    }
+
+    // A flat-laid package — `root .`, no subdirectory shares its own name — whose
+    // files nonetheless address their own top level the way an installed consumer
+    // would: a package with no directory named after itself, where every one of
+    // its own modules imports itself as `acme.contracts…`. Nothing in `roots` can
+    // recognize that, since there is no `acme/` directory to have put there; this
+    // is what `own` is for.
+    #[test]
+    fn a_flat_package_recognizes_its_own_declared_name() {
+        assert_eq!(
+            owned_specs(
+                "runtime/host.py",
+                &["contracts", "runtime"],
+                "acme",
+                "from acme.contracts.types import Event\n"
+            ),
+            [
+                "../contracts/types.py",
+                "../contracts/types/__init__.py",
+                "../contracts/types/Event.py",
+                "../contracts/types/Event/__init__.py",
+            ]
+        );
+        assert_eq!(
+            owned_specs(
+                "runtime/host.py",
+                &["contracts", "runtime"],
+                "acme",
+                "import acme.contracts.types\n"
+            ),
+            ["../contracts/types.py", "../contracts/types/__init__.py"]
+        );
+    }
+
+    #[test]
+    fn a_bare_self_import_names_the_module_roots_own_init() {
+        assert_eq!(
+            owned_specs("runtime/host.py", &["contracts", "runtime"], "acme", "import acme\n"),
+            ["../__init__.py"]
+        );
+        assert_eq!(
+            owned_specs(
+                "runtime/host.py",
+                &["contracts", "runtime"],
+                "acme",
+                "from acme import contracts\n"
+            ),
+            ["../__init__.py", "../contracts.py", "../contracts/__init__.py"]
+        );
+    }
+
+    // A manifest's PyPI-style hyphenated name is never how the code spells it —
+    // hyphens are not legal in a Python identifier — so the match folds `-` to `_`
+    // the same way installing the package already does.
+    #[test]
+    fn a_hyphenated_declared_name_matches_its_underscored_import() {
+        assert_eq!(
+            owned_specs(
+                "mod.py",
+                &["contracts"],
+                "my-package",
+                "from my_package.contracts import X\n"
+            ),
+            ["contracts.py", "contracts/__init__.py", "contracts/X.py", "contracts/X/__init__.py"]
+        );
+    }
+
+    // A package that genuinely nests under a directory of its own name is not this
+    // rule's business — `roots` already resolves it, and stripping the leading
+    // segment here would silently drop a real path component.
+    #[test]
+    fn a_package_that_already_has_a_directory_of_its_own_name_is_untouched() {
+        assert_eq!(
+            owned_specs("mod.py", &["acme"], "acme", "from acme.contracts import X\n"),
+            [
+                "acme/contracts.py",
+                "acme/contracts/__init__.py",
+                "acme/contracts/X.py",
+                "acme/contracts/X/__init__.py",
+            ]
+        );
     }
 
     #[test]

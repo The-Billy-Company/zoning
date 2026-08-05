@@ -37,6 +37,7 @@ fn survey_of(grown: &dice::Grown, ordinance: &Ordinance) -> Survey {
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
+        package: &ordinance.package,
         tracked: None,
     })
 }
@@ -288,6 +289,7 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
+        package: &ordinance.package,
         tracked: None,
     });
     let found = judge::judge(&survey, &ordinance);

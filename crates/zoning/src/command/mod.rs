@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use args::{Options, Verb};
-use scope::{basename, module, probe, scope, tail};
+use scope::{basename, declared, module, probe, scope, tail};
 use zoning::Result;
 use zoning::judge::{self, Verdict};
 use zoning::ordinance::{self, Fault, Ordinance};
@@ -74,6 +74,12 @@ pub(crate) fn run() -> Result<ExitCode> {
         }
         return Ok(ExitCode::SUCCESS);
     }
+    // Started before the scope is even resolved — `discover`'s own `git ls-files` is
+    // the first thing that can take a moment — and stopped just before whichever verb
+    // below prints its answer, so a person watching never sees more than a spinner or
+    // a report, never a silent gap between them.
+    let spinner = zoning::spinner::Spinner::start("zone is reading the graph");
+
     let here = match &options.root {
         Some(given) => given.clone(),
         None => std::env::current_dir()
@@ -87,13 +93,14 @@ pub(crate) fn run() -> Result<ExitCode> {
     let mut tracked = Tracked::new(&anchor, options.untracked);
 
     match options.verb {
-        Verb::Draft => return draft::draft(&options, &mut tracked),
-        Verb::List => return list::list(&options, &root, &mut tracked),
-        Verb::Explain => return explain::explain(&options, &root, &mut tracked),
+        Verb::Draft => return draft::draft(&options, &mut tracked, &spinner),
+        Verb::List => return list::list(&options, &root, &mut tracked, &spinner),
+        Verb::Explain => return explain::explain(&options, &root, &mut tracked, &spinner),
         _ => {}
     }
 
     if contracts.is_empty() && !options.complete {
+        spinner.stop();
         let Ink { green, reset, dim, .. } = options.ink;
         println!(
             "{green}✓{reset} zone: nothing governed under {} {dim}— `zone list` shows what \
@@ -103,14 +110,32 @@ pub(crate) fn run() -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    judge_all(&options, &root, &contracts, &mut tracked, &spinner)
+}
+
+/// Read every contract in scope, turn each into whichever report `verify`, `status`,
+/// `show`, or `map` asked for, and print the whole answer at once.
+///
+/// The shared tail of those four verbs: they differ only in what a resolved contract
+/// becomes, never in how contracts are found, read, or surveyed.
+fn judge_all(
+    options: &Options,
+    root: &Path,
+    contracts: &[PathBuf],
+    tracked: &mut Tracked<'_>,
+    spinner: &zoning::spinner::Spinner,
+) -> Result<ExitCode> {
     let mut failed = false;
     let mut verdicts: Vec<Verdict> = Vec::new();
     let mut out = String::new();
 
-    for path in &contracts {
+    for path in contracts {
         let contract = match Ordinance::read(path, options.language) {
             Ok(contract) => contract,
             Err(fault) => {
+                // A fault prints to the same stream the spinner animates, so it
+                // stops here rather than racing an `eprintln!` mid-frame.
+                spinner.stop();
                 report_fault(&fault, options.ink);
                 failed = true;
                 continue;
@@ -125,10 +150,11 @@ pub(crate) fn run() -> Result<ExitCode> {
         }
 
         let found = Survey::of(&Ask {
-            repo_root: &root,
+            repo_root: root,
             module_root: &contract.module_root,
             exclude: &contract.exclude,
             dialect: contract.dialect,
+            package: &contract.package,
             tracked: tracked.of(contract.dialect),
         });
 
@@ -147,11 +173,12 @@ pub(crate) fn run() -> Result<ExitCode> {
     }
 
     if options.complete {
-        failed |= !ungoverned(&options, &root, &mut tracked, &mut out)?;
+        failed |= !ungoverned(options, root, tracked, &mut out)?;
     }
     if options.json {
         out.push_str(&report::records(&verdicts));
     }
+    spinner.stop();
     print!("{out}");
     let _ = std::io::stdout().flush();
 
@@ -181,7 +208,8 @@ fn ungoverned(
             .ok_or_else(|| format!("no dialect named `{}`", parcel.language))?;
         let dir = root.join(&parcel.dir);
         let (source, inside) = module(&dir);
-        let found = probe(&dir, source, dialect, tracked, &inside);
+        let name = declared(&dir, dialect).unwrap_or_default();
+        let found = probe(&dir, source, dialect, tracked, &inside, &name);
         // A manifest with no source behind it declares a package without being a module,
         // so there is nothing for a contract to say about it and nothing missing.
         if found.files.is_empty() {

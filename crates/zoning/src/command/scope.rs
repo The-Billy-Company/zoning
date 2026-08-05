@@ -139,6 +139,7 @@ pub(super) fn probe(
     dialect: &'static dyn Dialect,
     tracked: &mut Tracked<'_>,
     nested: &[String],
+    package: &str,
 ) -> Survey {
     let exclude: Vec<zoning::pattern::Pattern> =
         nested.iter().map(|glob| zoning::pattern::Pattern::new(glob)).collect();
@@ -147,6 +148,7 @@ pub(super) fn probe(
         module_root: &dir.join(source),
         exclude: &exclude,
         dialect,
+        package,
         tracked: tracked.of(dialect),
     })
 }

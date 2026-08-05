@@ -66,6 +66,7 @@
 //!     module_root: &contract.module_root,
 //!     exclude: &contract.exclude,
 //!     dialect: contract.dialect,
+//!     package: &contract.package,
 //!     tracked: None,
 //! });
 //! let verdict = judge::judge(&found, &contract);
@@ -82,6 +83,7 @@ pub mod ordinance;
 pub mod pattern;
 pub mod report;
 pub mod setup;
+pub mod spinner;
 pub mod survey;
 
 pub use error::{Error, Result};

@@ -151,6 +151,7 @@ fn a_contract_that_survives_mangling_can_still_be_judged() {
                 module_root: &layered.join("src"),
                 exclude: &ordinance.exclude,
                 dialect: ordinance.dialect,
+                package: &ordinance.package,
                 tracked: None,
             });
             let _ = zoning::judge::judge(&survey, &ordinance);
@@ -200,6 +201,7 @@ fn the_import_scanner_survives_source_that_is_not_source() {
             module_root: &module,
             exclude: &[],
             dialect: zig(),
+            package: "",
             tracked: None,
         });
         let _ = std::fs::remove_dir_all(&dir);

@@ -76,6 +76,7 @@ fn owning_contract(path: &Path) -> Option<(Ordinance, Survey)> {
                 module_root: &contract.module_root,
                 exclude: &contract.exclude,
                 dialect: contract.dialect,
+                package: &contract.package,
                 tracked: None,
             });
             return Some((contract, survey));

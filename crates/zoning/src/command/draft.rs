@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use zoning::Result;
 use zoning::ordinance;
 use zoning::report::Ink;
+use zoning::spinner::Spinner;
 
 use super::Tracked;
 use super::args::Options;
@@ -14,7 +15,11 @@ use super::scope::{barren, declared, module, pathdiff, probe, tail};
 ///
 /// The directory is taken as typed, from the shell's own working directory — `draft .`
 /// means here, whatever subtree a verify would have chosen to read.
-pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<ExitCode> {
+pub(super) fn draft(
+    options: &Options,
+    tracked: &mut Tracked<'_>,
+    spinner: &Spinner,
+) -> Result<ExitCode> {
     let here =
         std::env::current_dir().map_err(|e| format!("cannot read the current directory: {e}"))?;
     let target = options.args.first().map_or(".", String::as_str);
@@ -50,13 +55,14 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
         )
         .into());
     }
-    let found = probe(&dir, source, options.language, tracked, &nested);
+    let found = probe(&dir, source, options.language, tracked, &nested, &name);
     if found.files.is_empty() {
         return Err(barren(&dir, source, options.language, &nested).into());
     }
     let text = zoning::draft::contract(&found, &name, source, &nested);
 
     if !options.write {
+        spinner.stop();
         print!("{text}");
         let _ = std::io::stdout().flush();
         return Ok(ExitCode::SUCCESS);
@@ -73,6 +79,7 @@ pub(super) fn draft(options: &Options, tracked: &mut Tracked<'_>) -> Result<Exit
     }
     std::fs::create_dir_all(&home).map_err(|e| format!("{}: {e}", home.display()))?;
     std::fs::write(&file, &text).map_err(|e| format!("{}: {e}", file.display()))?;
+    spinner.stop();
     let Ink { green, reset, dim, .. } = options.ink;
     println!(
         "{green}✓{reset} wrote {} {dim}— now run `zone verify --package {name}`{reset}",

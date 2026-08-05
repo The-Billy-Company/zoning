@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use zoning::Result;
 use zoning::ordinance::{self, Ordinance};
 use zoning::report;
+use zoning::spinner::Spinner;
 use zoning::survey::{Ask, Survey};
 
 use super::Tracked;
@@ -20,6 +21,7 @@ pub(super) fn explain(
     options: &Options,
     root: &Path,
     tracked: &mut Tracked<'_>,
+    spinner: &Spinner,
 ) -> Result<ExitCode> {
     let here =
         std::env::current_dir().map_err(|e| format!("cannot read the current directory: {e}"))?;
@@ -55,6 +57,7 @@ pub(super) fn explain(
         module_root: &contract.module_root,
         exclude: &contract.exclude,
         dialect: contract.dialect,
+        package: &contract.package,
         tracked: tracked.of(contract.dialect),
     });
     let named: Vec<String> = wanted
@@ -67,6 +70,7 @@ pub(super) fn explain(
         [from, to] => report::edge(from, to, &contract, &found, &options.ink),
         _ => return Err("`explain` takes one file, or two".into()),
     };
+    spinner.stop();
     print!("{}", answer.text);
     let _ = std::io::stdout().flush();
     // The same code `verify` uses for the same news, so "is this legal" is a shell

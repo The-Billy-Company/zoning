@@ -32,6 +32,7 @@ fn fixture(kind: &str, name: &str) -> (Ordinance, Survey) {
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
+        package: &ordinance.package,
         tracked: None,
     });
     assert!(
@@ -223,6 +224,7 @@ fn drafted(kind: &str, name: &str) -> (PathBuf, Result<Ordinance, zoning::ordina
         module_root: &module_root,
         exclude: &[],
         dialect: zig(),
+        package: name,
         tracked: None,
     });
     let text = zoning::draft::contract(&survey, name, "src", &[]);
@@ -242,6 +244,7 @@ fn a_draft_describes_the_graph_it_was_taken_from() {
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
+        package: &ordinance.package,
         tracked: None,
     });
     let found = judge::judge(&survey, &ordinance);

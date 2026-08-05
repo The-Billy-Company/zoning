@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use zoning::Result;
 use zoning::ordinance;
 use zoning::report::Ink;
+use zoning::spinner::Spinner;
 use zoning::survey;
 
 use super::Tracked;
@@ -18,7 +19,12 @@ use super::scope::{basename, declared, module, probe, tail};
 /// The question adoption actually asks. A list of the packages that *have* a contract
 /// cannot tell you whether you are finished, and the ungoverned ones are why anybody
 /// runs this — so they are the rows that carry a command.
-pub(super) fn list(options: &Options, root: &Path, tracked: &mut Tracked<'_>) -> Result<ExitCode> {
+pub(super) fn list(
+    options: &Options,
+    root: &Path,
+    tracked: &mut Tracked<'_>,
+    spinner: &Spinner,
+) -> Result<ExitCode> {
     let Ink { green, yellow, dim, reset, .. } = options.ink;
     let parcels = ordinance::parcels(root, &options.under);
     let mut out = String::new();
@@ -43,11 +49,11 @@ pub(super) fn list(options: &Options, root: &Path, tracked: &mut Tracked<'_>) ->
                 .ok_or_else(|| format!("no dialect named `{}`", parcel.language))?;
             let dir = root.join(&parcel.dir);
             let (source, inside) = module(&dir);
-            let found = probe(&dir, source, dialect, tracked, &inside);
             // The name a draft will actually give it, so the two agree before anybody has
             // run one — a listing that calls the package by its directory and a contract
             // that calls it by its manifest is one more thing to reconcile by hand.
             let name = declared(&dir, dialect).unwrap_or_else(|| basename(root, &parcel.dir));
+            let found = probe(&dir, source, dialect, tracked, &inside, &name);
             // A package with no source of its own is not a gap in coverage. Build-time
             // chassis packages exist, and so do trees whose only content is a nested
             // dependency — telling somebody to draft a contract for either is telling
@@ -101,6 +107,7 @@ pub(super) fn list(options: &Options, root: &Path, tracked: &mut Tracked<'_>) ->
             known.join("; ")
         );
     }
+    spinner.stop();
     print!("{out}");
     if open > 0 {
         println!("\n  {governed} governed, {yellow}{open} ungoverned{reset}");

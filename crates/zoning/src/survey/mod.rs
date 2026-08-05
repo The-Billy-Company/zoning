@@ -92,6 +92,11 @@ pub struct Ask<'a> {
     pub exclude: &'a [Pattern],
     /// The language.
     pub dialect: &'static dyn Dialect,
+    /// This package's own declared name — the contract's `package NAME`, or a
+    /// draft's best guess when there is no contract yet. Empty when nobody has
+    /// named it. Only a dialect whose import spelling can name a whole package by
+    /// the same identifier it is installed under reads this.
+    pub package: &'a str,
     /// The version-controlled file set, or `None` to judge the whole walk.
     pub tracked: Option<&'a HashSet<PathBuf>>,
 }
@@ -173,7 +178,7 @@ impl Survey {
             let Ok(raw) = fs::read_to_string(abs) else { continue };
             let code = ask.dialect.prose().code_only(&raw);
             let lines = Lines::of(&raw);
-            for import in ask.dialect.imports(src, &roots, &raw, &code) {
+            for import in ask.dialect.imports(src, &roots, ask.package, &raw, &code) {
                 let line = lines.at(import.offset);
                 let col = column(&raw, import.offset);
                 let width = raw[import.offset..]

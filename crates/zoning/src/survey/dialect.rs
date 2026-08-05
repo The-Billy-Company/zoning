@@ -75,16 +75,27 @@ pub trait Dialect: Sync {
     ///
     /// `path` is the importing file's own module-relative path, and `roots` is every
     /// top-level name this survey judges as local — the first path segment of a
-    /// nested file, or the bare stem of one loose at the module root. Neither is
+    /// nested file, or the bare stem of one loose at the module root. `own` is the
+    /// package's own declared name (empty when it has none). None of the three is
     /// needed by a dialect whose import spelling is already a path relative to
-    /// itself; both exist for a dialect whose spelling is a dotted or absolute module
-    /// name, which needs the importer's own depth to turn a climb into `../` and
-    /// needs the root set to tell its own package from an external one sharing the
-    /// same leading word.
+    /// itself; all exist for a dialect whose spelling is a dotted or absolute module
+    /// name: `path` gives the importer's own depth, to turn a climb into `../`;
+    /// `roots` tells its own package from an external one sharing the same leading
+    /// word; and `own` catches the case `roots` cannot — a flat-laid package whose
+    /// files address their own top level the way an installed consumer would
+    /// (`import acme.contracts` from inside `acme` itself, when `acme` is not a
+    /// subdirectory of anything but its own module root).
     ///
     /// `code` is `source` with prose blanked and byte offsets preserved; find the
     /// statement there and read its argument out of `source` at the same offset.
-    fn imports(&self, path: &str, roots: &[&str], source: &str, code: &[u8]) -> Vec<Import>;
+    fn imports(
+        &self,
+        path: &str,
+        roots: &[&str],
+        own: &str,
+        source: &str,
+        code: &[u8],
+    ) -> Vec<Import>;
 
     /// Does this spec name a file inside the module, rather than an external
     /// dependency the build system resolves?
