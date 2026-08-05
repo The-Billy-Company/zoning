@@ -152,3 +152,27 @@ jobs:
           git add CHANGELOG.md changelog.d
           git commit -m "chore(changelog): fold fragments for v$version"
           git push origin "HEAD:$BRANCH"
+
+      # `extra-files` just bumped editors/vscode/package.json's version, but the
+      # VSIX released.yml embeds in the zoning executable is a build artifact of
+      # that manifest, not a mirror of it — nothing re-packages it just because
+      # the version moved. ci.yml's `editors` job diffs the two and fails the
+      # instant they part ways, so the release PR must refresh this here or
+      # every release would open red on a check nobody told to run again.
+      - name: Refresh the deterministic VS Code/Cursor payload
+        env:
+          BRANCH: ${{ fromJson(needs.release-please.outputs.pr).headBranchName }}
+        working-directory: editors/vscode
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run package
+          if git diff --quiet HEAD -- ../../crates/zoning/src/setup/payload/zoning.vsix; then
+            echo "editor payload already matches this version"
+            exit 0
+          fi
+          git config user.name 'billy-company-release[bot]'
+          git config user.email 'billy-company-release[bot]@users.noreply.github.com'
+          git add ../../crates/zoning/src/setup/payload/zoning.vsix
+          git commit -m "chore(editors): refresh the deterministic VS Code/Cursor payload"
+          git push origin "HEAD:$BRANCH"
