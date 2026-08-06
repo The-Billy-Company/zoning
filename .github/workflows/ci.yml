@@ -153,17 +153,25 @@ jobs:
         working-directory: editors/vscode
         run: |
           npm ci
+          npm test
           npm run package
           git diff --exit-code -- ../../crates/zoning/src/setup/payload/zoning.vsix
-      - name: Zed grammar
+      - name: tree-sitter
         working-directory: editors/zed/grammar
-        run: |
-          npm ci
-          npm test
+        run: npm ci
+      - name: Zed grammar and queries
+        run: ./editors/zed/test/run.sh
       - name: Zed extension
         run: cargo check --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1
-      - name: Vim runtime
-        run: vim -Nu NONE -n -es -S editors/vim/test/runtime.vim
+      # Two implementations of the same runtime files, and they disagree: `l:` scope at script
+      # level, where `:echo` goes in silent mode, and whether an autoload function may be
+      # defined in the wrong file are each a difference these suites have caught. Ubuntu ships
+      # vim; Neovim is a package away, and running only one of the two would leave half the
+      # users of these files unchecked.
+      - name: Neovim
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y neovim
+      - name: Vim and Neovim runtime
+        run: ./editors/vim/test/run.sh
       - name: Embedded package still compiles
         run: cargo check --locked
 
