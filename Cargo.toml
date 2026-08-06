@@ -12,7 +12,8 @@ rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/The-Billy-Company/zoning"
 homepage = "https://github.com/The-Billy-Company/zoning"
-authors = [ "Griffin Strier <griffin@billylives.com>" ]
+documentation = "https://docs.rs/zoning"
+authors = [ "The Billy Company" ]
 keywords = [ "import-topology", "static-analysis", "architecture", "linter", "zig" ]
 categories = [ "development-tools", "development-tools::build-utils" ]
 

@@ -2,7 +2,7 @@ id = "zoning"
 name = "Zoning"
 version = "1.0.0"
 schema_version = 1
-authors = [ "Griffin Strier <griffin@billylives.com>" ]
+authors = [ "The Billy Company" ]
 description = "Architecture contracts and language intelligence for .zone files."
 repository = "https://github.com/The-Billy-Company/zoning"
 

@@ -18,7 +18,7 @@ description = "An import-topology gate: declare the zones a package's imports ma
 readme = "README.md"
 license = "Apache-2.0"
 license-files = [ "LICENSE", "NOTICE" ]
-authors = [ { name = "Griffin Strier", email = "griffin@billylives.com" } ]
+authors = [ { name = "The Billy Company" } ]
 keywords = [ "import-topology", "static-analysis", "architecture", "linter", "zig" ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
