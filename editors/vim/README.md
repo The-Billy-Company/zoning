@@ -42,9 +42,21 @@ let g:zoning_ascii_icon = 1      " Width-safe ASCII fallback: [=]
 `g:zoning_nerd_font_icon` can replace the Nerd Font glyph without patching the
 runtime.
 
-## Smoke test
+## Tests
 
 ```sh
-vim -Nu NONE -n -es -S test/runtime.vim
-nvim --clean --headless -S test/runtime.vim
+./test/run.sh          # every suite below, in every Vim on this machine, as TAP
 ```
+
+| Suite | What it holds |
+| --- | --- |
+| `test/detect.vim` | `ftdetect` claims `.zone` by name, extension, and shebang, and the terminal icon honors each of the three settings |
+| `test/buffer.vim` | the `ftplugin` options, `indentexpr` on every block and continuation form, and `foldexpr` over nested braces |
+| `test/syntax.vim` | the group at a given line and column, and what it links to - which is how a keyword painted inside a comment, or a law repainted as a statement, gets caught |
+| `test/lsp.vim` | registration against each supported client - vim-lsp, vim-lsc, coc.nvim, ALE, and Neovim's native `vim.lsp` - through an autoload shim standing in for the plugin |
+
+`run.sh` runs each suite under both `vim` and `nvim` when both are installed,
+because the two disagree about `l:` scope at script level, where `:echo` goes
+in silent mode, and whether an autoload function may live in the wrong file -
+each of which this suite has already caught. A machine with neither installed
+is a failure rather than a silent pass.
