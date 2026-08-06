@@ -13,6 +13,9 @@
       "include": "#foldedReasons"
     },
     {
+      "include": "#zones"
+    },
+    {
       "include": "#declarations"
     },
     {
@@ -80,6 +83,77 @@
           }
         }
       ]
+    },
+    "zones": {
+      "comment": "A zone name is only a name because of where it sits, so the block has to be entered to see it - a flat rule would either miss it or claim the first word of every line in the file. The nested path block is entered by the same trick one level down, and closes on its own `}` before this rule ever tests for one.",
+      "begin": "^\\s*(zones)\\s*(\\{)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.zoning"
+        },
+        "2": {
+          "name": "punctuation.section.block.zoning"
+        }
+      },
+      "end": "^\\s*(\\})",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.block.zoning"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#pathBlock"
+        },
+        {
+          "include": "#zoneName"
+        },
+        {
+          "include": "#globs"
+        }
+      ]
+    },
+    "pathBlock": {
+      "begin": "^\\s*([^\\s{}\"]+)\\s*(\\{)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.section.zoning"
+        },
+        "2": {
+          "name": "punctuation.section.block.zoning"
+        }
+      },
+      "end": "^\\s*(\\})",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.block.zoning"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#globs"
+        }
+      ]
+    },
+    "zoneName": {
+      "match": "^\\s*([^\\s{}\"]+)",
+      "captures": {
+        "1": {
+          "name": "entity.name.section.zoning"
+        }
+      }
     },
     "declarations": {
       "patterns": [

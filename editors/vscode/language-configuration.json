@@ -34,7 +34,8 @@
   ],
   "wordPattern": "[^\\s{}\"']+",
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(?:package\\s+[^\\s{]+|zones|variance\\s+cycle)\\s*\\{\\s*(?://.*)?$",
-    "decreaseIndentPattern": "^\\s*\\}"
+    "increaseIndentPattern": "^[^}/\"]*\\{\\s*(?://.*)?$",
+    "decreaseIndentPattern": "^\\s*\\}",
+    "indentNextLinePattern": "\\bbecause\\s*$"
   }
 }

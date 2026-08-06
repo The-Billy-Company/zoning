@@ -24,3 +24,12 @@ npm run package
 `npm run package` creates `artifacts/zoning-<version>.vsix`. The bundle is
 minified without source maps or timestamps, and packaging excludes source,
 tests, build tools, dependencies, and the zoning executable.
+
+`npm test` runs three suites over the contributions themselves, none of which
+needs VS Code running:
+
+| Suite | What it holds |
+| --- | --- |
+| `tests/tokens.test.mjs` | the real TextMate scopes, tokenized through `vscode-textmate` and `vscode-oniguruma` the way the editor does - so a keyword painted inside a comment, or a law scoped as a statement, is a failed assertion rather than something you notice in a screenshot |
+| `tests/language.test.mjs` | `language-configuration.json`'s comment, bracket, word, and indentation rules, each exercised as the regex the editor compiles |
+| `tests/manifest.test.mjs` | every path `package.json` contributes exists, the grammar's scope agrees with the language id, and the activation events and settings are the ones the extension reads |

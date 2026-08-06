@@ -7,13 +7,6 @@ const root = resolve(import.meta.dirname, "..");
 const manifest = JSON.parse(
   await readFile(resolve(root, "package.json"), "utf8"),
 );
-const grammar = JSON.parse(
-  await readFile(
-    resolve(root, "syntaxes/zoning.tmLanguage.json"),
-    "utf8",
-  ),
-);
-
 test("manifest registers language, commands, and bundled client", () => {
   assert.deepEqual(manifest.contributes.languages[0].extensions, [".zone"]);
   assert.deepEqual(
@@ -24,25 +17,50 @@ test("manifest registers language, commands, and bundled client", () => {
   assert.equal(manifest.main, "./dist/extension.js");
 });
 
-test("grammar covers every declaration and comment spelling", () => {
-  const encoded = JSON.stringify(grammar);
-  for (const word of [
-    "package",
-    "workspace",
-    "member",
-    "zones",
-    "seal",
-    "keep",
-    "use",
-    "limit",
-    "forbid",
-    "variance",
-    "because",
+test("everything the manifest points at is on disk and wired to the language", async () => {
+  const [language] = manifest.contributes.languages;
+  const [grammar] = manifest.contributes.grammars;
+  assert.equal(language.id, "zoning");
+  assert.equal(grammar.language, language.id, "a grammar for another language paints nothing");
+  for (const path of [
+    language.configuration,
+    language.icon.light,
+    language.icon.dark,
+    grammar.path,
+    manifest.main,
   ]) {
-    assert.match(encoded, new RegExp(`\\\\b.*${word}|${word}.*\\\\b`));
+    await readFile(resolve(root, path), "utf8");
   }
-  assert.match(encoded, /double-slash/);
-  assert.match(encoded, /folded-reason/);
+  const declared = JSON.parse(await readFile(resolve(root, grammar.path), "utf8"));
+  assert.equal(
+    declared.scopeName,
+    grammar.scopeName,
+    "the manifest and the grammar must agree on the scope name, or nothing loads",
+  );
+});
+
+test("the extension activates on the language it contributes", () => {
+  const [language] = manifest.contributes.languages;
+  assert.ok(
+    manifest.activationEvents.includes(`onLanguage:${language.id}`),
+    "opening a contract has to be enough to start the server",
+  );
+  for (const { command } of manifest.contributes.commands) {
+    assert.ok(
+      manifest.activationEvents.includes(`onCommand:${command}`),
+      `${command} is in the palette, so it has to be able to wake the extension`,
+    );
+  }
+});
+
+test("the executable is a setting, so an unpublished build can be pointed at", () => {
+  const setting = manifest.contributes.configuration.properties["zoning.executablePath"];
+  assert.equal(setting.default, "zoning", "the default is the name the crate installs");
+  assert.equal(
+    setting.scope,
+    "machine-overridable",
+    "a path is a property of the machine, not of the repository",
+  );
 });
 
 test("bundle delegates to an external zoning executable", async () => {
