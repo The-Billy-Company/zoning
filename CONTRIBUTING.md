@@ -86,6 +86,32 @@ A property or fuzz failure prints `ZONING_SEED=…`; pasting that in front of
 `cargo test` replays it exactly, which is the only part of shrinking that
 matters at this size.
 
+### The editor loop
+
+Each of the four editors reads the same language through a different runtime, so
+each has its own suite and none of them needs the editor installed to run:
+
+```bash
+cargo test --test lsp                    # the protocol: every advertised capability, both transports
+cargo test --test editors                # parity: every adapter launches the server and claims .zone
+./editors/vim/test/run.sh                # every suite in every Vim on this machine (TAP)
+(cd editors/zed/grammar && npm ci) && ./editors/zed/test/run.sh   # grammar corpus, highlights, queries
+(cd editors/vscode && npm ci && npm test)                         # TextMate scopes, indent rules, manifest
+```
+
+`tests/lsp.rs` holds a parity gate: an advertised capability with no test
+answering it fails the suite, so `capabilities()` cannot grow a promise the
+server does not keep. `tests/editors.rs` is the seam between the two halves —
+it reads the adapter files themselves and requires each one to spell the same
+`zoning lsp --stdio` the protocol suite proves, so an adapter and a passing
+server can't drift apart silently.
+
+The Vim runner reports TAP and runs both `vim` and `nvim` when both are
+present; a machine with neither is a failure rather than a silent pass. The Zed
+runner regenerates the parser, runs the corpus and highlight annotations, and
+then runs each `.scm` against a fixture — an unmatched query compiles fine and
+paints nothing, which is exactly what a grammar rename leaves behind.
+
 ## The constraints a change is held to
 
 - **Every failure names its remedy.** [README.md](README.md#overview) puts it
@@ -119,11 +145,11 @@ fail before a build would matter:
 
 | Job | What it holds |
 | --- | --- |
-| `check` | `cargo fmt --check`, `cargo clippy --all-targets --all-features`, `cargo test --all-features`, `cargo deny check` (`deny.toml`: advisories, licenses, bans) |
+| `check` | `cargo fmt --check`, `cargo clippy --all-targets --all-features`, `cargo test --all-features` (the LSP conformance and adapter-parity suites among them), `cargo deny check` (`deny.toml`: advisories, licenses, bans) |
 | `dogfood` | the release binary judges every `tests/fixtures/{pass,fail}` box |
 | `portability` | `cargo test --release` on Linux, macOS, and Windows |
 | `wheel` | the maturin wheel builds and its installed console script judges a fixture, on all three platforms |
-| `editors` | the VS Code extension packages, the Zed grammar and extension build, the Vim runtime loads |
+| `editors` | VS Code's TextMate scopes and indent rules, the Zed grammar corpus and every `.scm` query, the Vim and Neovim runtime suites, and each extension still packages and builds |
 | `soak` | nightly, 50× the per-PR case count of the property and fuzz suites, from a fresh seed. Deliberately outside `release-ready` |
 | `actions` | zizmor and actionlint over every workflow |
 | `discipline` | markdownlint, typos, yamllint, Taplo, editorconfig-checker, Ruff (`tools/differential.py`, `editors/vscode/scripts/deterministic.py`), ShellCheck (`.githooks/pre-push`) |
