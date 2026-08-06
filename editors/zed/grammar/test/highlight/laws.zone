@@ -1,0 +1,39 @@
+workspace {
+// <- @keyword
+    member packages/*
+//  ^ @keyword
+    language zig
+//  ^ @keyword
+}
+
+// the package keyword and a core/** glob and 12 hops, all just prose
+// <- @comment
+//     ^ @comment
+//                           ^ @comment
+//                                            ^ @comment
+
+variance seal a.zig -> b.zig because "one"
+//       ^ @type
+//                           ^ @keyword
+variance keep a.zig -> b.zig because "two"
+//       ^ @type
+variance use a.zig -> b.zig because "three"
+//       ^ @type
+variance reach a.zig -> b.zig because "four"
+//       ^ @type
+variance zone a.zig -> b.zig because "five"
+//       ^ @type
+variance escape a.zig -> b.zig because "six"
+//       ^ @type
+
+variance cycle {
+// <- @keyword
+//       ^ @type
+    one.zig
+    two.zig
+}
+because
+// <- @keyword
+    \\ retire this once the common interface lands
+    \\ and the second line folds into the same reason
+//  ^ @string

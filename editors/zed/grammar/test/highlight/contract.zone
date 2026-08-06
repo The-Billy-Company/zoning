@@ -1,0 +1,58 @@
+package layered {
+// <- @keyword
+//      ^ @title
+    root src
+//  ^ @keyword
+    language zig
+//  ^ @keyword
+    exclude generated/**
+//  ^ @keyword
+}
+
+// a comment about the layers
+// <- @comment
+
+zones {
+// <- @keyword
+    floor floor.zig
+//  ^ @type
+    engine {
+//  ^ @type
+        engine/**
+    }
+}
+
+seal engine through engine.zig open to face.zig
+// <- @keyword
+//   ^ @type
+//          ^ @keyword
+//                             ^ @keyword
+//                                  ^ @keyword
+
+keep face.zig to root.zig
+// <- @keyword
+//   ^ @type
+//            ^ @keyword
+
+use ledger hyper by engine face
+// <- @keyword
+//               ^ @keyword
+
+limit reach to 2 hops
+// <- @keyword
+//    ^ @keyword
+//             ^ @number
+//               ^ @keyword
+
+forbid cycles across directories
+// <- @keyword
+//     ^ @keyword
+//            ^ @keyword
+//                   ^ @keyword
+
+variance seal face.zig -> engine/parts.zig because "retire through the facade"
+// <- @keyword
+//       ^ @type
+//                     ^ @operator
+//                                         ^ @keyword
+//                                                 ^ @string

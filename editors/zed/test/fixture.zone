@@ -1,0 +1,33 @@
+// Every construct the Zed queries have something to say about, in one file: the queries are
+// run against this and their captures are checked, so a query that compiles but matches
+// nothing - the way a query goes wrong after a grammar rule is renamed - is a failure here.
+package layered {
+    root src
+    language zig
+    facade root.zig
+    exclude generated/**
+}
+
+zones {
+    floor floor.zig
+    engine {
+        engine/**
+        shared/**
+    }
+    face face.zig
+}
+
+seal engine through engine.zig open to face.zig
+keep face.zig to root.zig
+use ledger hyper by engine face
+limit reach to 2 hops
+forbid cycles across directories
+variance seal face.zig -> engine/parts.zig because "retire through the \"facade\""
+
+variance cycle {
+    floor.zig
+    engine.zig
+}
+because
+    \\ the loader has to see the engine to load it
+    \\ and the engine has to log through the floor

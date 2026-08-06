@@ -27,9 +27,17 @@ The `.zone` icon proposal therefore has a separate submission template under
 ## Local development
 
 1. Install `zoning` and confirm `zoning lsp --stdio` starts.
-2. Run `npm ci && npm test` in `grammar/`.
+2. Run `npm ci` in `grammar/`, then `./test/run.sh` from this directory.
 3. Run `cargo check --target wasm32-wasip1`.
 4. In Zed, use **Install Dev Extension** and select this directory.
+
+`test/run.sh` regenerates the parser, runs the corpus and the highlight
+annotations under `grammar/test/`, and then runs each of the four `.scm`
+queries against `test/fixture.zone`. That last pass is the one worth having:
+a query that no longer matches anything still compiles, and Zed's only symptom
+is a buffer that stops being painted where the rule used to apply. The runner
+requires every capture Zed reads to actually appear, and rejects a capture name
+outside the closed set Zed's themes key off - a typo there is invisible by eye.
 
 Zed downloads the WASI SDK when it compiles the grammar. The generated
 Tree-sitter C parser is committed because it is the deterministic source Zed
