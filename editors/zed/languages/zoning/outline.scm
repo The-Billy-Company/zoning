@@ -1,6 +1,11 @@
 (package_declaration
   name: (word) @name) @item
 
+(workspace_setting
+  "member"
+  value: (paths
+    (word) @name)) @item
+
 (zone_definition
   name: (word) @name) @item
 

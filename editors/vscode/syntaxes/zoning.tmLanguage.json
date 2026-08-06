@@ -95,7 +95,15 @@
           }
         },
         {
-          "match": "^\\s*(seal|keep|use)\\s+([^\\s{]+)",
+          "match": "^\\s*(workspace)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.workspace.zoning"
+            }
+          }
+        },
+        {
+          "match": "^\\s*(member|seal|keep|use)\\s+([^\\s{]+)",
           "captures": {
             "1": {
               "name": "keyword.declaration.zoning"
@@ -122,7 +130,7 @@
       "patterns": [
         {
           "name": "keyword.control.zoning",
-          "match": "\\b(?:package|root|language|facade|exclude|zones|seal|through|open|to|keep|nobody|use|by|limit|reach|hop|hops|forbid|cycles|across|directories|variance|because)\\b"
+          "match": "\\b(?:package|workspace|member|root|language|facade|exclude|zones|seal|through|open|to|keep|nobody|use|by|limit|reach|hop|hops|forbid|cycles|across|directories|variance|because)\\b"
         },
         {
           "name": "support.type.law.zoning",

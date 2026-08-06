@@ -3,6 +3,12 @@
 A runtime-path plugin for `.zone` files:
 
 - filetype detection, syntax, comments, indentation, and expression folding
+
+`.zone` is BIND's extension too, so detection claims only the files that lead
+with `package` or `workspace` — the same first declaration the tool identifies a
+contract by. Anything else is left for the editor's own content detection, which
+already calls a DNS zone file `bindzone` without this plugin naming it.
+
 - Neovim 0.11 native LSP auto-enable through `lsp/zoning.lua`
 - adapters for vim-lsp, vim-lsc, ALE, and coc.nvim when detected
 - optional `nvim-web-devicons` registration

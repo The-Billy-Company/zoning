@@ -10,7 +10,7 @@ syntax match zoningNumber '\<\d\+\>'
 syntax match zoningArrow '->'
 syntax match zoningBrace '[{}]'
 syntax match zoningPath '\S*\%(\*\*\|\*\|/\)\S*'
-syntax keyword zoningKeyword package root language facade exclude zones
+syntax keyword zoningKeyword package workspace member root language facade exclude zones
 syntax keyword zoningKeyword seal through open to keep nobody use by
 syntax keyword zoningKeyword limit reach hop hops forbid cycles across
 syntax keyword zoningKeyword directories variance because

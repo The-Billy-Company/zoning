@@ -7,6 +7,8 @@ use crate::ordinance::Law;
 
 const KEYWORDS: &[(&str, &str)] = &[
     ("package", "Name the governed package."),
+    ("workspace", "Hold a set of packages together and share their settings."),
+    ("member", "Claim the packages that hang off this workspace."),
     ("root", "Name the package's source root."),
     ("language", "Select the source dialect."),
     ("facade", "Name files allowed to reach every zone."),
@@ -137,7 +139,7 @@ fn symbols(text: &str) -> Vec<Value> {
         .enumerate()
         .filter_map(|(line, source)| {
             let trimmed = source.trim_start();
-            let kind = ["package ", "seal ", "keep ", "use ", "variance "]
+            let kind = ["package ", "member ", "seal ", "keep ", "use ", "variance "]
                 .iter()
                 .find(|prefix| trimmed.starts_with(**prefix))?;
             let name = trimmed

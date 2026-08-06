@@ -6,6 +6,8 @@
 
 [
   "package"
+  "workspace"
+  "member"
   "root"
   "language"
   "facade"

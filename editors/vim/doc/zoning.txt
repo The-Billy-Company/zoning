@@ -3,6 +3,11 @@
 Install this directory on 'runtimepath'. Files ending in .zone receive the
 zoning filetype, syntax, indentation, folding, and language-server support.
 
+BIND uses the same extension, so a file is claimed only when its first
+declaration is `package` or `workspace`, which is how the tool itself tells a
+contract from a nameserver file. Everything else keeps whatever filetype the
+editor's own content detection gives it.
+
 The executable is never bundled. Set this before the plugin loads if `zoning`
 is not on PATH:
 >

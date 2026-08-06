@@ -13,6 +13,7 @@ module.exports = grammar({
       repeat(
         choice(
           $.package_declaration,
+          $.workspace_declaration,
           $.zones_declaration,
           $.seal_declaration,
           $.keep_declaration,
@@ -24,14 +25,20 @@ module.exports = grammar({
         ),
       ),
 
+    // The block is optional: a member of a workspace can inherit every setting, and
+    // then there is nothing left to put between the braces.
     package_declaration: ($) =>
       seq(
         "package",
         field("name", $.word),
-        "{",
-        $._newline,
-        repeat(choice(seq($.package_setting, $._newline), $._newline)),
-        "}",
+        optional(
+          seq(
+            "{",
+            $._newline,
+            repeat(choice(seq($.package_setting, $._newline), $._newline)),
+            "}",
+          ),
+        ),
         $._newline,
       ),
 
@@ -41,6 +48,33 @@ module.exports = grammar({
         seq("language", field("value", $.word)),
         seq("facade", field("value", $.paths)),
         seq("exclude", field("value", $.paths)),
+      ),
+
+    // `use` and `limit` are whole statements and eat their own line end; the settings
+    // are one value each and leave that to the block.
+    workspace_declaration: ($) =>
+      seq(
+        "workspace",
+        "{",
+        $._newline,
+        repeat(
+          choice(
+            seq($.workspace_setting, $._newline),
+            $.use_declaration,
+            $.limit_declaration,
+            $._newline,
+          ),
+        ),
+        "}",
+        $._newline,
+      ),
+
+    workspace_setting: ($) =>
+      choice(
+        seq("member", field("value", $.paths)),
+        seq("root", field("value", $.word)),
+        seq("language", field("value", $.word)),
+        seq("facade", field("value", $.paths)),
       ),
 
     zones_declaration: ($) =>

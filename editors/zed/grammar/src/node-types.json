@@ -262,6 +262,10 @@
           "named": true
         },
         {
+          "type": "workspace_declaration",
+          "named": true
+        },
+        {
           "type": "zones_declaration",
           "named": true
         }
@@ -351,6 +355,49 @@
           },
           {
             "type": "edge",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "workspace_declaration",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "limit_declaration",
+          "named": true
+        },
+        {
+          "type": "use_declaration",
+          "named": true
+        },
+        {
+          "type": "workspace_setting",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "workspace_setting",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "paths",
+            "named": true
+          },
+          {
+            "type": "word",
             "named": true
           }
         ]
@@ -484,6 +531,10 @@
     "named": false
   },
   {
+    "type": "member",
+    "named": false
+  },
+  {
     "type": "nobody",
     "named": false
   },
@@ -534,6 +585,10 @@
   {
     "type": "word",
     "named": true
+  },
+  {
+    "type": "workspace",
+    "named": false
   },
   {
     "type": "zone",

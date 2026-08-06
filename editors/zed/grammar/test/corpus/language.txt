@@ -20,7 +20,7 @@ zones {
 
 seal engine through engine.zig open to face.zig
 keep face.zig to root.zig
-use irregex gist by engine face
+use ledger hyper by engine face
 limit reach to 2 hops
 forbid cycles across directories
 variance seal face.zig -> engine/parts.zig because "retire through the facade"
@@ -67,3 +67,45 @@ because
     law: (law)
     subject: (cycle member: (word) member: (word))
     reason: (folded_reason (reason_text) (reason_text))))
+
+==================
+Workspace holding members together
+==================
+
+workspace {
+  member libs/kernels/*
+  root src
+  language zig
+  facade root.zig
+  use ledger by **
+  limit reach to 1 hop
+}
+
+---
+
+(source_file
+  (workspace_declaration
+    (workspace_setting value: (paths (word)))
+    (workspace_setting value: (word))
+    (workspace_setting value: (word))
+    (workspace_setting value: (paths (word)))
+    (use_declaration modules: (paths (word)) scope: (paths (word)))
+    (limit_declaration count: (number))))
+
+==================
+Member inheriting every setting
+==================
+
+package hearth
+
+zones {
+  forge forge.zig
+}
+
+---
+
+(source_file
+  (package_declaration
+    name: (word))
+  (zones_declaration
+    (zone_definition name: (word) paths: (paths (word)))))

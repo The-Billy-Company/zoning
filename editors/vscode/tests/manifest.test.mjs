@@ -28,6 +28,8 @@ test("grammar covers every declaration and comment spelling", () => {
   const encoded = JSON.stringify(grammar);
   for (const word of [
     "package",
+    "workspace",
+    "member",
     "zones",
     "seal",
     "keep",
