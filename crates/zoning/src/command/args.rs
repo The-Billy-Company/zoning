@@ -30,13 +30,20 @@ OPTIONS
     --root PATH         the subtree to govern (default: here, or the package enclosing it)
     --language NAME     language for packages that do not name one (default: zig)
     --complete          verify: also fail if a package in scope has no contract
-    --write             draft: create contract/<name>.zone if it does not exist
+    --write             draft: create <name>.zone at the package root if none governs it
     --untracked         judge files version control does not know about
     --suggest           print the declarations that would make today's graph legal
     --json              one record per finding on stdout
     --no-color          never colour, even on a terminal
     -h, --help          this
     -V, --version       the version
+
+CONTRACTS
+    pkg/<name>.zone     a contract sits at the root of what it organizes, beside the
+                        manifest (a file in pkg/contract/ still governs pkg/ too)
+    workspace { … }     a file above them claims members and says the shared settings
+                        once — language, root, facade, use, limit reach — so each
+                        member's contract holds only what makes it different
 
 EXIT
     0  every governed package passes

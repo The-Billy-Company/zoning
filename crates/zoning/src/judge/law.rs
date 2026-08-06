@@ -311,15 +311,19 @@ impl Bench<'_> {
         // written for — the same debt a spent-out variance is, and deleted the same way.
         // Counted per line, not per module: two scoped grants for one module are two
         // separate claims, and one of them going quiet is exactly what should surface.
+        //
+        // A grant this package inherited is a different claim: it is dead only when *no*
+        // member exercises it, and one bench sees one member. Those go out unjudged, for
+        // the run to settle once every member has been through here.
         let file = contract_name(self);
-        let idle: Vec<String> = ordinance
-            .uses
-            .iter()
-            .enumerate()
-            .filter(|(at, _)| !spent.contains(at))
-            .map(|(_, u)| format!("use {}  ({file}: nothing imports it)", written(u)))
-            .collect();
-        self.stale.extend(idle);
+        for (_, grant) in ordinance.uses.iter().enumerate().filter(|(at, _)| !spent.contains(at)) {
+            let line = written(grant);
+            if grant.inherited {
+                self.dormant.push(format!("use {line}"));
+            } else {
+                self.stale.push(format!("use {line}  ({file}: nothing imports it)"));
+            }
+        }
     }
 
     /// **escape** — an import may not climb out of the module root.
@@ -352,7 +356,7 @@ struct Refusal<'a> {
 impl Refusal<'_> {
     /// The finding's message, and the subject a variance would have to name.
     ///
-    /// The subject reads as an edge from a scope to a module (`exec -> pcre2`) because
+    /// The subject reads as an edge from a scope to a module (`runtime -> hyper`) because
     /// that is what a `variance use` ratifies: a dependency somebody means to retire,
     /// as against a `use` grant, which is one they mean to keep. Two spellings, and the
     /// difference between them is whether the line carries a reason.

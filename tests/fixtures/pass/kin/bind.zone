@@ -1,0 +1,8 @@
+; A BIND DNS zone, which has owned this extension since long before zoning existed.
+; It sits where a contract now sits, so identity cannot be the extension: a sweep that
+; parsed every `*.zone` would fail this repository's build over its nameserver data.
+$TTL 3600
+$ORIGIN example.com.
+@   IN  SOA ns1.example.com. hostmaster.example.com. ( 1 3600 600 604800 3600 )
+@   IN  NS  ns1.example.com.
+ns1 IN  A   192.0.2.1

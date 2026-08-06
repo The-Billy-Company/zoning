@@ -159,11 +159,11 @@ alone.
 
 ## The Language
 
-A package opts in by writing `contract/<name>.zone` beside its code, and here
-is a whole one:
+A package opts in by writing `<name>.zone` at its own root, beside the manifest
+and every other file that configures it, and here is a whole one:
 
 ```
-package irregex {
+package acme {
     root     src
     language zig
     facade   root.zig
@@ -196,19 +196,82 @@ Comments are `//`. Globs mean what they mean to a Python reader; the matcher is
 CPython's `glob.translate(..., recursive=True, include_hidden=True)`,
 reimplemented and pinned by tests against that reference.
 
+### Where The File Goes
+
+A contract sits at the root of what it organizes: `acme/acme.zone`
+governs `acme/`. That is where the manifest, the formatter config, and the
+CI config already live, and a boundary tool that demanded its own directory
+would be asking for a folder to hold one page.
+
+A file inside a `contract/` drawer still governs the drawer's parent, because
+that was the only layout zoning accepted before and contracts are checked in. A
+tool does not get to invalidate a repository's on-disk shape to tidy its own
+rules. Both spellings resolve to the same anchor and nothing downstream can tell
+them apart; `zone draft --write` only mints the first.
+
+`.zone` is also BIND's extension for DNS data, and now that a contract sits
+where a nameserver file might, the extension cannot be what identifies one. So a
+contract leads with `package` or `workspace` — what it governs, before anything
+it says about it — and a sweep skips any `*.zone` that opens with something
+else. That is a claim of authorship rather than a guess about content, and it
+only governs sweeping: a file named on the command line is parsed, and faults,
+like anything else.
+
 ### The Package Block
 
-`root` names the source directory, relative to the contract's grandparent
-(`contract/x.zone` → `../../src`). `language` names the dialect this package is
-read in, so a monorepo holding several is still one run. `facade` names the files
-that may reach anywhere: the module's public face, which by construction
-re-exports everything and therefore imports everything. `exclude` drops paths
-from judgment entirely.
+`root` names the source directory, relative to the directory the contract
+governs. `language` names the dialect this package is read in, so a monorepo
+holding several is still one run. `facade` names the files that may reach
+anywhere: the module's public face, which by construction re-exports everything
+and therefore imports everything. `exclude` drops paths from judgment entirely.
+
+The whole block is optional. A member of a workspace can inherit every setting
+in it, and then `package hearth` on one line is the entire header — a mandatory
+empty `{ }` is exactly the boilerplate the workspace was written to delete.
 
 The file that *declares* the package — `build.zig`, `pyproject.toml` — is never
 judged as part of it, in any dialect. A build script legitimately imports things
 no module file may, and a package whose contract made declaring it illegal would
 be a joke.
+
+### Workspaces
+
+Ten packages in one tree are ten copies of the same four lines, and boilerplate
+is not a cosmetic problem: four lines nobody reads are four lines nobody
+notices are wrong, and a per-package fact that is really a whole-repository fact
+will eventually disagree with itself in one package and pass. So a file above
+them may claim them and say the shared part once:
+
+```
+workspace {
+    member   libs/kernels/*
+    root     src
+    language zig
+    facade   root.zig
+    use      hyper by core/**
+    limit    reach to 1 hop
+}
+```
+
+The link points down, the way `[workspace] members` and `[tool.uv.workspace]`
+do: the greater document claims its members, and a package is a member because
+something above it said so, never because it declared a parent. One less thing
+to keep in sync, and a package cannot quietly attach itself to a policy nobody
+granted it. Inheritance is one hop — a member finds the nearest workspace above
+it that claims it, and that is the whole search, because a chain of overriding
+defaults is a thing you debug rather than a thing you read.
+
+A member's own word always wins, so inheritance can delete a line somebody had
+to repeat but can never change the meaning of one they wrote. What a workspace
+*cannot* share is anything naming a file: zones, seals, keeps, and variances are
+claims about one graph, and a blanket exception written once for a whole monorepo
+is the accretion this language exists to prevent. Nor can a shared grant be
+scoped by zone name — zones belong to a package and each member's are its own —
+so `use hyper by core/**` is a path glob or nothing.
+
+A file may hold both blocks: a root package with members below it. A file that
+holds only a `workspace` governs no graph of its own, so a sweep finds it and
+never offers it up to be judged.
 
 ### Zones
 
@@ -269,6 +332,15 @@ declaring it would bury the handful of grants that are decisions.
 
 A grant nobody exercises is stale, and stale is a failure. It is a permission
 somebody forgot to withdraw.
+
+A grant a member *inherited* is judged once, against the whole workspace. Asking
+each member to exercise every shared line would make sharing a line strictly
+worse than repeating it, since one grant of nine members would fail eight times.
+So it is stale only when no member exercises it, and the report names the
+workspace that wrote it rather than a package that merely lives under it — and
+a run that judged only part of the membership (`--under`, or a contract that
+would not parse) says nothing at all, because absence of evidence across an
+unknown remainder is not evidence.
 
 ### Structural Laws
 
@@ -426,7 +498,8 @@ zone explain from.zig to.zig && $EDITOR from.zig
 - **`explain FILE`** – one file's zone, reach, grants, and importers.
 - **`explain FROM TO`** – whether that one import is legal, and the clause that
   decides.
-- **`draft DIR`** – the contract `DIR`'s graph already obeys. `--write` files it.
+- **`draft DIR`** – the contract `DIR`'s graph already obeys. `--write` files it
+  at `DIR`'s root, and refuses if either layout already governs `DIR`.
 
 Options: `--package NAME`, `--under DIR` (monorepos), `--root PATH`,
 `--language NAME`, `--complete`, `--write`, `--untracked`, `--suggest`, `--json`,

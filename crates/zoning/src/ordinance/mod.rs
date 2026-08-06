@@ -37,14 +37,16 @@ mod fault;
 mod law;
 mod lex;
 mod parse;
+mod plat;
+mod workspace;
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 pub use fault::{Fault, Span};
 pub use law::Law;
+pub use plat::{Parcel, anchor, discover, governing, parcels};
 
 use crate::pattern::{Globs, Pattern};
 use crate::survey::Dialect;
@@ -89,7 +91,7 @@ pub struct Keep {
 /// One outside module, and the zones granted it.
 ///
 /// The grant is per module rather than per zone because a dependency is a decision
-/// about the dependency: "who is allowed to carry `pcre2`" is one line to read and
+/// about the dependency: "who is allowed to carry `hyper`" is one line to read and
 /// one line to change, where a `needs` list on every zone would spread the same fact
 /// across the whole file and let two zones disagree about it.
 pub struct Use {
@@ -101,6 +103,13 @@ pub struct Use {
     pub written: Vec<String>,
     /// `file:line`, so a stale grant can be deleted without a search.
     pub source: String,
+    /// Came from the workspace rather than from this package's own contract.
+    ///
+    /// A grant this package never exercises is dead permission — but a *shared* grant
+    /// is dead only when no member exercises it, and one package cannot see the others.
+    /// So the bench sets it aside and the run decides, which is the only place the whole
+    /// membership is in view.
+    pub inherited: bool,
 }
 
 impl Use {
@@ -127,6 +136,8 @@ pub struct Variance {
 pub struct Ordinance {
     /// The `.zone` file it was read from.
     pub path: PathBuf,
+    /// The workspace file it inherited from, when one claims this package.
+    pub workspace: Option<PathBuf>,
     /// The package name it governs.
     pub package: String,
     /// The language its code is read in.
@@ -189,7 +200,13 @@ impl Ordinance {
         source: &str,
         fallback: &'static dyn Dialect,
     ) -> Result<Self, Fault> {
-        resolve(parse::parse(source, path)?, path, source, fallback)
+        let tree = parse::parse(source, path)?;
+        // Looked up here rather than by the caller so that every entry point — the
+        // command line, the editor, a library user — inherits identically. A member
+        // judged one way by CI and another way by the LSP would be worse than no
+        // inheritance at all.
+        let shared = workspace::enclosing(path, fallback)?;
+        resolve(tree, path, source, fallback, shared.as_ref())
     }
 
     /// Analyse an unsaved editor buffer without touching the filesystem.
@@ -267,13 +284,31 @@ pub fn cycle_subject(members: &[String]) -> String {
     sorted.join(" + ")
 }
 
+/// Turn a parsed file, plus whatever its workspace already said, into one contract.
+///
+/// Every setting reads the same way: what this file says, else what the workspace said,
+/// else what the tree obviously is. The member always wins, so inheritance can only ever
+/// remove a line somebody would otherwise have had to repeat — never change the meaning
+/// of one they wrote.
 fn resolve(
     tree: parse::Tree,
     path: &Path,
     source: &str,
     fallback: &'static dyn Dialect,
+    shared: Option<&workspace::Shared>,
 ) -> Result<Ordinance, Fault> {
-    let pkg = tree.package;
+    let Some(pkg) = tree.package else {
+        // Only reachable when a caller names a workspace file itself: a sweep already
+        // knows the difference and never offers one up to be judged.
+        let lead =
+            tree.workspace.as_ref().map_or_else(|| Span::head(path), |w| w.lead.span.clone());
+        return Err(Fault::at(
+            "this file holds a workspace together and governs no package of its own — \
+             judge its members, or add a `package` block to govern this directory too",
+            lead,
+            source,
+        ));
+    };
     let dialect = match &pkg.language {
         Some(named) => crate::survey::dialect(&named.text).ok_or_else(|| {
             let known: Vec<&str> = crate::survey::dialects().iter().map(|d| d.name()).collect();
@@ -287,42 +322,80 @@ fn resolve(
                 source,
             )
         })?,
-        None => fallback,
+        None => shared.and_then(|s| s.language).unwrap_or(fallback),
     };
-    let root = pkg.root.as_ref().map_or("src", |t| t.text.as_str());
-    let base = path.parent().and_then(Path::parent).unwrap_or(Path::new("."));
+    let base = plat::anchor(path);
+    let inherited_root = shared.and_then(|s| s.root.as_deref());
+    let root = match pkg.root.as_ref().map(|t| t.text.as_str()).or(inherited_root) {
+        Some(named) => named,
+        // `src/` where there is one, the package itself otherwise. Saying so is a line
+        // in every contract that has one and a required line in every contract that
+        // does not, and the answer is on disk either way.
+        None if base.join("src").is_dir() => "src",
+        None => ".",
+    };
     let module_root = base.join(root);
     if !module_root.is_dir() {
-        let blame = pkg.root.as_ref().unwrap_or(&pkg.name);
-        return Err(Fault::at(
-            format!("source root `{root}` is not a directory"),
-            blame.span.clone(),
-            source,
-        ));
+        let blame = pkg.root.as_ref().unwrap_or(&pkg.name).span.clone();
+        let message = format!("source root `{root}` is not a directory");
+        return Err(match shared.filter(|_| pkg.root.is_none()) {
+            Some(shared) => workspace::blame(shared, &message, blame, source),
+            None => Fault::at(message, blame, source),
+        });
     }
     let module_root = module_root.canonicalize().unwrap_or(module_root);
 
     let zones = resolve_zones(&tree.zones, source)?;
     let seals = resolve_seals(&tree.seals, &module_root, root, source)?;
     let keeps = resolve_keeps(&tree.keeps, source)?;
-    let uses = resolve_uses(&tree.uses, &zones, dialect, path, source)?;
+    let uses = inherit(resolve_uses(&tree.uses, &zones, dialect, path, source)?, shared);
     let (variances, granted) = resolve_variances(&tree.variances, path, source)?;
+    let facade = if pkg.facade.is_empty() {
+        Globs::new(shared.map(|s| s.facade.clone()).unwrap_or_default())
+    } else {
+        Globs::new(pkg.facade.iter().map(|t| &t.text))
+    };
 
     Ok(Ordinance {
         path: path.to_path_buf(),
+        workspace: shared.map(|s| s.path.clone()),
         package: pkg.name.text,
         dialect,
         module_root,
-        facade: Globs::new(pkg.facade.iter().map(|t| &t.text)),
+        facade,
         exclude: pkg.exclude.iter().map(|t| Pattern::new(&t.text)).collect(),
         zones,
         seals,
         keeps,
         uses,
-        max_hops: tree.reach.map(|(n, _)| n),
+        max_hops: tree.reach.map(|(n, _)| n).or_else(|| shared.and_then(|s| s.max_hops)),
         variances,
         granted,
     })
+}
+
+/// This package's own grants, plus the shared ones it did not already speak for.
+///
+/// A member re-granting a module the workspace already granted is narrowing it — `use
+/// httpx by runtime/**` under a workspace-wide `use httpx` — and the narrower line is the
+/// decision, so it replaces rather than joins. Two grants for one module would otherwise
+/// both look complete while the wider one silently governed.
+fn inherit(own: Vec<Use>, shared: Option<&workspace::Shared>) -> Vec<Use> {
+    let Some(shared) = shared else { return own };
+    let mut uses: Vec<Use> = shared
+        .uses
+        .iter()
+        .filter(|grant| !own.iter().any(|mine| mine.module == grant.module))
+        .map(|grant| Use {
+            module: grant.module.clone(),
+            scope: grant.scope.clone(),
+            written: grant.written.clone(),
+            source: grant.source.clone(),
+            inherited: true,
+        })
+        .collect();
+    uses.extend(own);
+    uses
 }
 
 /// Rank the zones bottom-up, refusing a name that appears twice.
@@ -488,6 +561,7 @@ fn resolve_uses(
                 scope: Globs::new(&scope),
                 written: written.clone(),
                 source: format!("{file}:{}", statement.lead.span.line),
+                inherited: false,
             });
         }
     }
@@ -538,170 +612,4 @@ fn resolve_variances(
         });
     }
     Ok((variances, granted))
-}
-
-/// A package the tool can see: where it is, what language, and whether it is governed.
-///
-/// "Parcel" because the answer worth having is about land, not about contracts — a
-/// list of the packages that *have* a contract cannot say whether adoption is
-/// finished, and the ungoverned ones are the whole reason to ask.
-pub struct Parcel {
-    /// Repo-relative directory holding the package manifest.
-    pub dir: String,
-    /// The language whose manifest was found there.
-    pub language: &'static str,
-    /// Its contracts, if it declares any.
-    pub contracts: Vec<PathBuf>,
-    /// The enclosing package that vendored this one, when a manifest above says so.
-    pub vendored_by: Option<String>,
-}
-
-/// Every `contract/*.zone` in the tree, at any depth.
-///
-/// Depth is not the tool's business: a repository that *is* the package carries
-/// `contract/*.zone` at its own root, a monorepo buries them at
-/// `libs/kernels/<pkg>/contract/`, and neither should have to say so on the command
-/// line. `under` narrows the sweep to named subtrees when a caller wants only part of
-/// a large repository; it is a filter, never a requirement.
-///
-/// The module root always hangs off the zone file's own grandparent, so nothing
-/// downstream can tell the two shapes apart.
-#[must_use]
-pub fn discover(repo_root: &Path, under: &[String]) -> Vec<PathBuf> {
-    sweep(repo_root, under).0
-}
-
-/// Every package in the tree, governed or not, sorted by directory.
-#[must_use]
-pub fn parcels(repo_root: &Path, under: &[String]) -> Vec<Parcel> {
-    let (contracts, mut found) = sweep(repo_root, under);
-    let vendored = borrowed(repo_root, &found);
-    for parcel in &mut found {
-        let home = repo_root.join(&parcel.dir).join("contract");
-        parcel.contracts =
-            contracts.iter().filter(|c| c.parent() == Some(&home)).cloned().collect();
-        parcel.vendored_by = vendored.get(&parcel.dir).cloned();
-    }
-    found
-}
-
-/// Which of these packages another one vendors, by that other one's own manifest.
-///
-/// Read from the manifests already found rather than from every manifest on disk, so
-/// this costs one small file read per package and answers nothing about trees the
-/// sweep was told to leave alone.
-fn borrowed(repo_root: &Path, found: &[Parcel]) -> HashMap<String, String> {
-    let mut owned = HashMap::new();
-    for parcel in found {
-        let Some(dialect) = crate::survey::dialect(parcel.language) else { continue };
-        let base = repo_root.join(&parcel.dir);
-        for manifest in dialect.manifests() {
-            let Ok(text) = fs::read_to_string(base.join(manifest)) else { continue };
-            for dir in dialect.vendored(&text) {
-                let rel = posix(&Path::new(&parcel.dir).join(&dir));
-                owned.insert(rel.trim_start_matches("./").to_owned(), parcel.dir.clone());
-            }
-        }
-    }
-    owned
-}
-
-/// One sweep, both answers: the contracts, and the package roots.
-///
-/// Both questions are about the same directory entries, so asking them separately would
-/// cross a large monorepo twice to learn less than one pass already saw.
-///
-/// Git answers first when it can. Finding contracts by reading every directory of a
-/// large monorepo costs seconds — measured at 7 on one of them — and a gate that slow
-/// stops being run, which is a correctness problem wearing a performance costume. One
-/// `git ls-files` covers tracked *and* untracked-but-not-ignored files in ~40 ms, so a
-/// contract written a moment ago is still found, and one sitting in an ignored
-/// directory is correctly invisible. Outside a worktree the walk still answers.
-fn sweep(repo_root: &Path, under: &[String]) -> (Vec<PathBuf>, Vec<Parcel>) {
-    let (mut contracts, mut parcels) = match indexed(repo_root) {
-        Some(paths) => sift(repo_root, paths.iter().map(String::as_str)),
-        None => walked(repo_root),
-    };
-    if !under.is_empty() {
-        let within =
-            |rel: &str| under.iter().any(|u| rel == u || rel.starts_with(&format!("{u}/")));
-        contracts.retain(|c| c.strip_prefix(repo_root).is_ok_and(|r| within(&posix(r))));
-        parcels.retain(|p| within(&p.dir));
-    }
-    contracts.sort();
-    parcels.sort_by(|a, b| a.dir.cmp(&b.dir));
-    parcels.dedup_by(|a, b| a.dir == b.dir);
-    (contracts, parcels)
-}
-
-/// Every contract and manifest git can see, tracked or merely present.
-fn indexed(repo_root: &Path) -> Option<Vec<String>> {
-    let mut command = Command::new("git");
-    command
-        .args(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--"])
-        .arg("*.zone")
-        .current_dir(repo_root);
-    for dialect in crate::survey::dialects() {
-        for manifest in dialect.manifests() {
-            command.arg(manifest).arg(format!("*/{manifest}"));
-        }
-    }
-    let out = command.output().ok()?;
-    out.status.success().then(|| {
-        String::from_utf8_lossy(&out.stdout)
-            .split('\0')
-            .filter(|p| !p.is_empty())
-            .map(str::to_owned)
-            .collect()
-    })
-}
-
-/// Sort repo-relative paths into the contracts and the package roots they imply.
-fn sift<'a>(repo_root: &Path, paths: impl Iterator<Item = &'a str>) -> (Vec<PathBuf>, Vec<Parcel>) {
-    let (mut contracts, mut parcels) = (Vec::new(), Vec::new());
-    for rel in paths {
-        let (dir, name) = rel.rsplit_once('/').unwrap_or((".", rel));
-        if Path::new(name).extension().is_some_and(|e| e.eq_ignore_ascii_case("zone")) {
-            if dir.rsplit_once('/').map_or(dir, |(_, d)| d) == "contract" {
-                contracts.push(repo_root.join(rel));
-            }
-        } else if let Some(dialect) =
-            crate::survey::dialects().iter().find(|d| d.manifests().contains(&name))
-        {
-            parcels.push(Parcel {
-                dir: dir.to_owned(),
-                language: dialect.name(),
-                contracts: Vec::new(),
-                vendored_by: None,
-            });
-        }
-    }
-    (contracts, parcels)
-}
-
-/// The same answer by reading directories, for a tree git does not know about.
-fn walked(repo_root: &Path) -> (Vec<PathBuf>, Vec<Parcel>) {
-    let mut stack = vec![repo_root.to_path_buf()];
-    let mut found: Vec<String> = Vec::new();
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = fs::read_dir(&dir) else { continue };
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            let Ok(kind) = entry.file_type() else { continue };
-            if kind.is_dir() {
-                if !crate::survey::SKIP.contains(&name.as_ref()) {
-                    stack.push(entry.path());
-                }
-            } else if let Ok(rel) = entry.path().strip_prefix(repo_root) {
-                found.push(posix(rel));
-            }
-        }
-    }
-    sift(repo_root, found.iter().map(String::as_str))
-}
-
-/// A relative path with forward slashes, whatever the platform spells them as.
-fn posix(rel: &Path) -> String {
-    rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/")
 }

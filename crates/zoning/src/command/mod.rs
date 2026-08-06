@@ -127,6 +127,12 @@ fn judge_all(
 ) -> Result<ExitCode> {
     let mut failed = false;
     let mut verdicts: Vec<Verdict> = Vec::new();
+    let mut roll = judge::Roll::new();
+    // `--under` narrows discovery itself, so a membership can be short a member before
+    // the loop even starts.
+    if !options.under.is_empty() {
+        roll.short();
+    }
     let mut out = String::new();
 
     for path in contracts {
@@ -138,10 +144,12 @@ fn judge_all(
                 spinner.stop();
                 report_fault(&fault, options.ink);
                 failed = true;
+                roll.short();
                 continue;
             }
         };
         if !options.packages.is_empty() && !options.packages.contains(&contract.package) {
+            roll.short();
             continue;
         }
         if options.verb == Verb::Show {
@@ -169,20 +177,40 @@ fn judge_all(
         } else if !options.json {
             out.push_str(&report::verdict(&verdict, options.ink, options.verb == Verb::Status));
         }
+        attend(&mut roll, contract.workspace.as_deref(), root, &verdict);
         verdicts.push(verdict);
     }
 
     if options.complete {
         failed |= !ungoverned(options, root, tracked, &mut out)?;
     }
+    let dormant = roll.dormant();
+    failed |= !dormant.is_empty();
     if options.json {
-        out.push_str(&report::records(&verdicts));
+        out.push_str(&report::records(&verdicts, &dormant));
+    } else if !options.suggest {
+        for shared in &dormant {
+            out.push_str(&report::dormant(shared, &tail(&shared.workspace), options.ink));
+        }
     }
     spinner.stop();
     print!("{out}");
     let _ = std::io::stdout().flush();
 
     Ok(if failed { ExitCode::from(1) } else { ExitCode::SUCCESS })
+}
+
+/// Fold one member's verdict into the roll of the workspace that claimed it.
+///
+/// The scope decides whether the roll may answer at all. A workspace *above* the scope
+/// claims members outside it, so this run saw only part of the membership — and members
+/// are always below the workspace file, which is what makes containment the whole test.
+fn attend(roll: &mut judge::Roll, workspace: Option<&Path>, root: &Path, verdict: &Verdict) {
+    match workspace {
+        Some(file) if file.starts_with(root) => roll.attend(file, verdict),
+        Some(_) => roll.short(),
+        None => {}
+    }
 }
 
 /// Whether every package in scope has a contract, printing the ones that do not.

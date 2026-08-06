@@ -1,0 +1,12 @@
+// The same workspace, one setting overridden — and the override is load-bearing: this
+// package's entry point is not called `root.zig`, so inheriting the shared facade would
+// leave it fronted by a file that does not exist and unclaimed by any zone. A member's
+// own word always wins, so inheritance can delete a line somebody had to repeat but
+// never change the meaning of one they wrote.
+package lantern {
+    facade entry.zig
+}
+
+zones {
+    wick wick.zig
+}

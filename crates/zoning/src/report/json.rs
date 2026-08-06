@@ -7,14 +7,28 @@
 
 use std::fmt::Write as _;
 
-use crate::judge::Verdict;
+use crate::judge::{Dormant, Verdict};
 
 /// Every finding and every stale declaration across the judged packages, as a JSON
 /// array. Stale declarations carry the law `"stale"`, which is not one of the six —
 /// they are the contract failing, not the code.
+///
+/// A dormant shared grant is filed the same way, under the workspace file that wrote it
+/// rather than a package: no package owns it, and every one of them was already asked.
 #[must_use]
-pub fn records(verdicts: &[Verdict]) -> String {
+pub fn records(verdicts: &[Verdict], dormant: &[Dormant]) -> String {
     let mut rows: Vec<String> = Vec::new();
+    for shared in dormant {
+        let workspace = shared.workspace.display().to_string();
+        for grant in &shared.grants {
+            rows.push(object(&[
+                ("package", Value::Text(&workspace)),
+                ("law", Value::Text("stale")),
+                ("subject", Value::Text(grant)),
+                ("message", Value::Text("no member of the workspace imports it")),
+            ]));
+        }
+    }
     for verdict in verdicts {
         for finding in &verdict.findings {
             rows.push(object(&[
@@ -89,6 +103,6 @@ mod tests {
 
     #[test]
     fn no_findings_is_an_empty_array_not_an_empty_string() {
-        assert_eq!(records(&[]), "[]\n");
+        assert_eq!(records(&[], &[]), "[]\n");
     }
 }

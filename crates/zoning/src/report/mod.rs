@@ -12,7 +12,7 @@ mod json;
 mod map;
 
 pub use explain::{edge, file};
-pub use human::{show, suggest, verdict};
+pub use human::{dormant, show, suggest, verdict};
 pub use json::records;
 pub use map::map;
 

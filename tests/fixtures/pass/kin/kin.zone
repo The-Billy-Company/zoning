@@ -1,0 +1,15 @@
+// The greater document two packages hang off. Nothing here names a file either of
+// them owns — zones, seals, and keeps are claims about one graph — only the facts
+// that are true of the set: the language, where each keeps its source, what fronts
+// it, what they may reach outside themselves, and how far an import may climb.
+//
+// It governs no package of its own, so a sweep finds it and does not offer it up to
+// be judged. It is read where each member resolves.
+workspace {
+    member   *
+    root     src
+    language zig
+    facade   root.zig
+    use      ledger by **
+    limit    reach to 1 hop
+}

@@ -67,17 +67,18 @@ pub(super) fn draft(
         let _ = std::io::stdout().flush();
         return Ok(ExitCode::SUCCESS);
     }
-    let home = dir.join("contract");
-    let file = home.join(format!("{name}.zone"));
-    if file.exists() {
+    // At the package root, beside the manifest it belongs to. A tool that made a
+    // directory before it had anything to put in it was asking for a filing cabinet to
+    // hold one page; the older `contract/` spelling is still read, just no longer minted.
+    if let Some(existing) = ordinance::governing(&dir) {
         return Err(format!(
-            "{} already exists — a draft never overwrites a contract somebody wrote; \
-             drop `--write` to read the draft instead",
-            file.display()
+            "{} already governs {name} — a draft never overwrites a contract somebody \
+             wrote; drop `--write` to read the draft instead",
+            tail(&existing)
         )
         .into());
     }
-    std::fs::create_dir_all(&home).map_err(|e| format!("{}: {e}", home.display()))?;
+    let file = dir.join(format!("{name}.zone"));
     std::fs::write(&file, &text).map_err(|e| format!("{}: {e}", file.display()))?;
     spinner.stop();
     let Ink { green, reset, dim, .. } = options.ink;

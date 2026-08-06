@@ -22,9 +22,14 @@ fn box_of(kind: &str, name: &str) -> PathBuf {
 }
 
 /// A fixture's contract and the graph it governs.
+///
+/// The contract is looked up rather than spelled, so a fixture may keep it at the package
+/// root or in the older `contract/` drawer and the suite covers both without saying which
+/// is which.
 fn fixture(kind: &str, name: &str) -> (Ordinance, Survey) {
     let box_dir = box_of(kind, name);
-    let contract = box_dir.join("contract").join(format!("{name}.zone"));
+    let contract = zoning::ordinance::governing(&box_dir)
+        .unwrap_or_else(|| panic!("fixture {kind}/{name} has no contract"));
     let ordinance = Ordinance::read(&contract, zig())
         .unwrap_or_else(|fault| panic!("fixture {kind}/{name} does not parse:\n{fault}"));
     let survey = Survey::of(&Ask {
@@ -301,6 +306,102 @@ fn a_package_is_named_what_its_manifest_names_it() {
     let manifest = box_of("pass", "host").join("build.zig.zon");
     let text = std::fs::read_to_string(&manifest).expect("the host fixture has a manifest");
     assert_eq!(zig().declared(&text).as_deref(), Some("host"));
+}
+
+/// One member of the `pass/kin` workspace, judged the way a run judges it.
+fn member(name: &str) -> (Ordinance, Verdict) {
+    let box_dir = box_of("pass", "kin").join(name);
+    let contract = zoning::ordinance::governing(&box_dir)
+        .unwrap_or_else(|| panic!("member {name} has no contract at its own root"));
+    let ordinance = Ordinance::read(&contract, zig())
+        .unwrap_or_else(|fault| panic!("member {name} does not resolve:\n{fault}"));
+    let survey = Survey::of(&Ask {
+        repo_root: &box_dir,
+        module_root: &ordinance.module_root,
+        exclude: &ordinance.exclude,
+        dialect: ordinance.dialect,
+        package: &ordinance.package,
+        tracked: None,
+    });
+    assert!(!survey.files.is_empty(), "member {name} surveyed no files — did the tree move?");
+    let verdict = judge::judge(&survey, &ordinance);
+    (ordinance, verdict)
+}
+
+#[test]
+fn a_contract_at_the_package_root_governs_the_directory_it_sits_in() {
+    // `pass/kin/hearth/hearth.zone`, with no `contract/` anywhere in the path. The proof
+    // it resolved against the right tree is that `root src` — inherited — landed on the
+    // package's own `src/`, and that the graph beneath it judged clean.
+    let (ordinance, found) = member("hearth");
+    assert!(ordinance.module_root.ends_with("hearth/src"), "{:?}", ordinance.module_root);
+    assert!(found.ok(), "expected clean, got {:?} / {:?}", laws(&found), found.stale);
+}
+
+#[test]
+fn a_member_inherits_every_shared_setting_and_overrides_the_one_it_names() {
+    let (hearth, _) = member("hearth");
+    assert!(hearth.workspace.is_some(), "hearth hangs off kin.zone");
+    assert_eq!(hearth.dialect.name(), "zig", "language, inherited");
+    assert_eq!(hearth.max_hops, Some(1), "limit reach, inherited");
+    assert!(hearth.is_facade("root.zig"), "facade, inherited");
+    assert!(hearth.may_use("forge.zig", "ledger"), "use, inherited");
+
+    // Same workspace, one line of its own — and only that line moves.
+    let (lantern, _) = member("lantern");
+    assert_eq!(lantern.workspace, hearth.workspace, "both members, one workspace");
+    assert!(lantern.is_facade("entry.zig"), "the member's own facade wins");
+    assert!(!lantern.is_facade("root.zig"), "and replaces the shared one rather than joining it");
+    assert_eq!(lantern.max_hops, Some(1), "everything it did not name is still inherited");
+}
+
+#[test]
+fn an_inherited_grant_no_member_exercises_is_the_workspaces_debt_not_a_members() {
+    // The whole reason a shared grant cannot be judged one package at a time. `lantern`
+    // imports nothing outside the language, so its own bench sees dead permission — but
+    // `hearth` exercises the same line, and neither can see the other.
+    let (_, lantern) = member("lantern");
+    assert!(lantern.ok(), "an inherited grant must not make a member stale: {:?}", lantern.stale);
+    assert!(lantern.stale.is_empty(), "{:?}", lantern.stale);
+    assert_eq!(lantern.dormant, ["use ledger by **"], "set aside for the run to settle");
+
+    let (_, hearth) = member("hearth");
+    assert!(hearth.dormant.is_empty(), "hearth spent it");
+
+    // The roll takes the intersection, and there is none.
+    let workspace = box_of("pass", "kin").join("kin.zone");
+    let mut roll = judge::Roll::new();
+    roll.attend(&workspace, &hearth);
+    roll.attend(&workspace, &lantern);
+    assert!(roll.dormant().is_empty(), "one member exercising it keeps the grant alive");
+}
+
+#[test]
+fn a_file_that_holds_a_workspace_together_governs_nothing_and_is_never_judged() {
+    let workspace = box_of("pass", "kin").join("kin.zone");
+    let Err(fault) = Ordinance::read(&workspace, zig()) else {
+        panic!("a file with no package of its own has no graph to judge");
+    };
+    assert!(
+        fault.to_string().contains("judge its members"),
+        "and it says what to do instead: {fault}"
+    );
+}
+
+#[test]
+fn discovery_reads_our_zone_files_and_leaves_everybody_elses_alone() {
+    // `.zone` belongs to BIND too, and a contract at a package root now sits exactly
+    // where a DNS zone would. So identity is the first declaration, not the extension.
+    let kin = box_of("pass", "kin");
+    let found = zoning::ordinance::discover(&kin, &[]);
+    let names: Vec<String> = found
+        .iter()
+        .filter_map(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+        .collect();
+    assert!(names.contains(&"hearth".to_owned()), "a contract at a package root: {names:?}");
+    assert!(names.contains(&"lantern".to_owned()), "and the other one: {names:?}");
+    assert!(!names.contains(&"bind".to_owned()), "a DNS zone is not addressed to us: {names:?}");
+    assert!(!names.contains(&"kin".to_owned()), "a pure workspace has no graph to judge");
 }
 
 #[test]

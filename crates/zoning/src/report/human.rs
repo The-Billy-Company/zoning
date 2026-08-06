@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 use super::Ink;
-use crate::judge::Verdict;
+use crate::judge::{Dormant, Verdict};
 use crate::ordinance::{Law, Ordinance};
 
 /// The verdict for one package, with the census when `census` is set.
@@ -95,6 +95,26 @@ pub fn verdict(found: &Verdict, ink: Ink, census: bool) -> String {
         for (directory, count) in &stats.seal_debt {
             let _ = writeln!(out, "    {count:4}  {directory}/");
         }
+    }
+    out
+}
+
+/// Shared grants no member of a workspace exercised.
+///
+/// The workspace-level twin of [`Verdict::stale`] — same debt, same remedy, one file
+/// away from the packages that reported it. Printed once, after the whole membership
+/// has been through the bench, because that is the first moment the claim can be true.
+#[must_use]
+pub fn dormant(shared: &Dormant, workspace: &str, ink: Ink) -> String {
+    let Ink { red, reset, dim, .. } = ink;
+    let mut out = format!(
+        "\n{red}✗{reset} zone [{workspace}]: {} shared grant(s) no member exercises {dim}\
+         (all {} judged) — delete them:{reset}\n",
+        shared.grants.len(),
+        shared.members
+    );
+    for grant in &shared.grants {
+        let _ = writeln!(out, "  {grant}");
     }
     out
 }
@@ -185,6 +205,9 @@ fn grants(found: &Verdict, ordinance: &Ordinance) -> Vec<String> {
 pub fn show(ordinance: &Ordinance, ink: Ink) -> String {
     let Ink { dim, reset, .. } = ink;
     let mut out = format!("package {}  ({})\n", ordinance.package, ordinance.path.display());
+    if let Some(workspace) = &ordinance.workspace {
+        let _ = writeln!(out, "  workspace {}", workspace.display());
+    }
     let _ = writeln!(out, "  root      {}", ordinance.module_root.display());
     let _ = writeln!(out, "  language  {}", ordinance.dialect.name());
     let _ = writeln!(out, "  facade    {}", dash(&ordinance.facade.to_string()));
@@ -211,7 +234,11 @@ pub fn show(ordinance: &Ordinance, ink: Ink) -> String {
         } else {
             grant.written.join(" ")
         };
-        let _ = writeln!(out, "  use       {} by {scope}", grant.module);
+        // Which grants this package chose and which it was handed is the difference
+        // between a line you may delete here and one you may only delete upstream.
+        let from =
+            if grant.inherited { format!("{dim} (workspace){reset}") } else { String::new() };
+        let _ = writeln!(out, "  use       {} by {scope}{from}", grant.module);
     }
     let ambient = ordinance.dialect.ambient().join(" ");
     let _ = writeln!(out, "  ambient   {}{dim} (granted by the language){reset}", dash(&ambient));

@@ -6,21 +6,22 @@
 //! name any other, and because analysis is lazy a genuine import cycle compiles
 //! clean. Architecture there is convention with nothing behind it.
 //!
-//! A package opts in by writing `contract/<name>.zone` next to its code:
+//! A package opts in by writing `<name>.zone` at its own root, beside the manifest and
+//! every other file that configures it:
 //!
 //! ```text
-//! package irregex {
+//! package acme {
 //!     root   src
 //!     facade root.zig
 //! }
 //!
 //! zones {                        // low to high; an import may not point up
 //!     portal   portal.zig
-//!     math     kernel/math/**
-//!     regex    kernel/regex/**
+//!     math     core/math/**
+//!     parser   core/parser/**
 //! }
 //!
-//! seal kernel/regex through regex.zig     // enter a deep module by its door
+//! seal core/parser through parser.zig     // enter a deep module by its door
 //! keep surface/api.zig to root.zig        // and this region has a guest list
 //!
 //! limit  reach to 5 hops
@@ -32,6 +33,24 @@
 //! Seven laws, one exception mechanism, and every exception must say how it gets
 //! retired — a variance that stops matching is a hard failure, so paying the debt
 //! forces deleting the entry. Exception lists shrink instead of accreting.
+//!
+//! Ten packages in one tree would be ten copies of the first four lines, so a file
+//! above them may claim them and say the shared part once:
+//!
+//! ```text
+//! workspace {
+//!     member   libs/kernels/*
+//!     root     src
+//!     language zig
+//!     facade   root.zig
+//!     limit    reach to 1 hop
+//! }
+//! ```
+//!
+//! The link points down, the way `[workspace] members` and `[tool.uv.workspace]` do,
+//! and a member's own contract keeps only what makes it different. Anything it declares
+//! wins, so inheritance can delete a line somebody had to repeat but never change the
+//! meaning of one they wrote.
 //!
 //! # The shape of the tool
 //!
@@ -59,7 +78,7 @@
 //! use zoning::{judge, ordinance::Ordinance, survey::{Ask, Survey}};
 //!
 //! let zig = zoning::survey::dialect("zig").expect("the zig dialect ships in-tree");
-//! let contract = Ordinance::read(Path::new("contract/irregex.zone"), zig)?;
+//! let contract = Ordinance::read(Path::new("acme.zone"), zig)?;
 //! let repo = Path::new(".");
 //! let found = Survey::of(&Ask {
 //!     repo_root: repo,
@@ -93,8 +112,8 @@ use std::path::{Path, PathBuf};
 /// The enclosing worktree, so zoning works from source or from an installed binary.
 ///
 /// Falls back to `start` when there is no repository above it: a directory with a
-/// `contract/` in it is still worth judging, and refusing to run outside version
-/// control would make the tool useless in exactly the sandboxes people test it in.
+/// contract in it is still worth judging, and refusing to run outside version control
+/// would make the tool useless in exactly the sandboxes people test it in.
 #[must_use]
 pub fn repo_root(start: &Path) -> PathBuf {
     let here = start.canonicalize().unwrap_or_else(|_| start.to_path_buf());

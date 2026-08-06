@@ -40,6 +40,7 @@ impl Standing {
 }
 
 /// The shape of a module, measured.
+#[derive(Default)]
 pub struct Census {
     /// Files in the judged set.
     pub files: usize,

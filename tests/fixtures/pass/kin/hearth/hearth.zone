@@ -1,0 +1,8 @@
+// A member that inherits everything: no block, because there is nothing left to say
+// that `../kin.zone` has not already said. The contract at the package root holds only
+// the one thing that is this package's own — its stack.
+package hearth
+
+zones {
+    forge forge.zig
+}

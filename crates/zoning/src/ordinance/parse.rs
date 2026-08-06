@@ -3,10 +3,13 @@
 //! The grammar, in full:
 //!
 //! ```text
-//! file     = { decl } END
-//! decl     = package | zones | seal | keep | use | limit | forbid | variance
-//! package  = "package" WORD "{" BREAK { setting BREAK } "}" BREAK
+//! file     = ( package | workspace ) { decl } END
+//! decl     = package | workspace | zones | seal | keep | use | limit | forbid | variance
+//! package  = "package" WORD [ "{" BREAK { setting BREAK } "}" ] BREAK
 //! setting  = "root" WORD | "language" WORD | "facade" paths | "exclude" paths
+//! workspace = "workspace" "{" BREAK { shared BREAK } "}" BREAK
+//! shared   = "member" paths | "root" WORD | "language" WORD | "facade" paths
+//!          | use | limit
 //! zones    = "zones" "{" BREAK { WORD paths BREAK } "}" BREAK
 //! paths    = WORD... | "{" BREAK { WORD... BREAK } "}"
 //! seal     = "seal" WORD "through" WORD [ "open" "to" paths ] BREAK
@@ -32,6 +35,18 @@
 //! down the block is reading up the architecture. `because` sits in the grammar
 //! rather than in a validation pass because an unexplained exception is the thing
 //! this language most wants to make unsayable.
+//!
+//! A file leads with `package` or `workspace` — what it governs, before anything it
+//! says about it. That reads better than the alternative, and it is also how a sweep
+//! recognises a contract at a glance now that one may sit anywhere in a tree rather
+//! than in a `contract/` drawer: `.zone` is an extension BIND has used for DNS since
+//! long before this tool, and identity has to be cheaper than parsing.
+//!
+//! Everything a member inherits lives *inside* the `workspace` block. A file may
+//! declare a package and a workspace at once — a root package with members below it —
+//! and then the two blocks must not be able to leak into each other: what the members
+//! share is indented under `workspace`, and what the file's own package is stays
+//! outside it.
 
 use std::path::Path;
 
@@ -46,6 +61,25 @@ pub(super) struct Package {
     pub language: Option<Token>,
     pub facade: Vec<Token>,
     pub exclude: Vec<Token>,
+}
+
+/// The `workspace { … }` block: which packages hang off this file, and what they all
+/// are unless one of them says otherwise.
+///
+/// The settings here are exactly the ones that are a fact about a *set* of packages —
+/// what language they are written in, where each keeps its source, what fronts it, what
+/// they may reach outside themselves, how far an import may climb. What a member cannot
+/// inherit is anything naming its own files: zones, seals, keeps, and variances are
+/// claims about one graph, and a blanket exception written once for a whole monorepo is
+/// the accretion this language exists to prevent.
+pub(super) struct Workspace {
+    pub lead: Token,
+    pub members: Vec<Token>,
+    pub root: Option<Token>,
+    pub language: Option<Token>,
+    pub facade: Vec<Token>,
+    pub uses: Vec<Use>,
+    pub reach: Option<(u32, Span)>,
 }
 
 /// One `name  paths…` row of the zones block.
@@ -85,7 +119,10 @@ pub(super) struct Variance {
 
 /// One parsed `.zone` file, exactly as written, before it means anything.
 pub(super) struct Tree {
-    pub package: Package,
+    /// The package it governs, absent in a file that only holds a workspace together.
+    pub package: Option<Package>,
+    /// The members hanging off it, and what they share.
+    pub workspace: Option<Workspace>,
     pub zones: Vec<Zone>,
     pub seals: Vec<Seal>,
     pub keeps: Vec<Keep>,
@@ -97,6 +134,13 @@ pub(super) struct Tree {
 /// Spellings that changed when `ward` became `zoning`, and what they became.
 /// A contract written against the old tool should say so, not fail as gibberish.
 const RENAMED: [(&str, &str); 3] = [("tiers", "zones"), ("tier", "zone"), ("allow", "variance")];
+
+/// What a file may open with: what it governs, before anything it says about it.
+const OPENERS: [&str; 2] = ["package", "workspace"];
+
+/// Every declaration, once the file has said what it governs.
+const DECLARATIONS: [&str; 9] =
+    ["package", "workspace", "zones", "seal", "keep", "use", "limit", "forbid", "variance"];
 
 struct Reader<'a> {
     source: &'a str,
@@ -204,6 +248,7 @@ impl Reader<'_> {
 
     fn parse(mut self) -> Result<Tree, Fault> {
         let mut package = None;
+        let mut workspace = None;
         let mut zones = Vec::new();
         let mut seen_zones = false;
         let (mut seals, mut keeps, mut uses) = (Vec::new(), Vec::new(), Vec::new());
@@ -211,10 +256,10 @@ impl Reader<'_> {
         let mut reach = None;
 
         self.skip_blank();
+        let mut opened = false;
         while self.head().kind != Kind::End {
-            let lead = self.keyword(&[
-                "package", "zones", "seal", "keep", "use", "limit", "forbid", "variance",
-            ])?;
+            let lead = self.keyword(if opened { &DECLARATIONS } else { &OPENERS })?;
+            opened = true;
             match lead.text.as_str() {
                 "package" => {
                     if package.is_some() {
@@ -225,6 +270,16 @@ impl Reader<'_> {
                         ));
                     }
                     package = Some(self.package(&lead)?);
+                }
+                "workspace" => {
+                    if workspace.is_some() {
+                        return Err(self.at(
+                            &lead,
+                            "a second `workspace` block — merge them so one list names \
+                             every member",
+                        ));
+                    }
+                    workspace = Some(self.workspace(&lead)?);
                 }
                 "zones" => {
                     if seen_zones {
@@ -248,22 +303,100 @@ impl Reader<'_> {
         }
 
         let head = self.tokens[0].clone();
-        let Some(package) = package else {
-            return Err(self.at(&head, "no `package` block — a zone file must say what it governs"));
-        };
-        if zones.is_empty() {
+        if package.is_some() && zones.is_empty() {
             return Err(
                 self.at(&head, "no `zones` block — a contract with no zones governs nothing")
             );
         }
-        Ok(Tree { package, zones, seals, keeps, uses, variances, reach })
+        // A declaration naming files, in a file that governs no package of its own, has
+        // nothing to name. Members do not inherit these, so quietly ignoring them would
+        // let a whole monorepo look sealed while nothing was.
+        if package.is_none() {
+            let local = [
+                ("zones", !zones.is_empty()),
+                ("seal", !seals.is_empty()),
+                ("keep", !keeps.is_empty()),
+                ("use", !uses.is_empty()),
+                ("limit", reach.is_some()),
+                ("variance", !variances.is_empty()),
+            ];
+            if let Some((word, _)) = local.into_iter().find(|(_, present)| *present) {
+                return Err(self.at(
+                    &head,
+                    format!(
+                        "`{word}` outside a `package` block — this file holds a workspace \
+                         together and governs no package of its own. What every member \
+                         shares goes inside `workspace {{ … }}`; what names one package's \
+                         own files belongs in that package's contract"
+                    ),
+                ));
+            }
+        }
+        Ok(Tree { package, workspace, zones, seals, keeps, uses, variances, reach })
+    }
+
+    /// `workspace { member … }` — the greater document a member's contract hangs off.
+    fn workspace(&mut self, lead: &Token) -> Result<Workspace, Fault> {
+        self.block(lead)?;
+        let mut out = Workspace {
+            lead: lead.clone(),
+            members: Vec::new(),
+            root: None,
+            language: None,
+            facade: Vec::new(),
+            uses: Vec::new(),
+            reach: None,
+        };
+        while self.head().kind != Kind::Close {
+            if self.head().kind == Kind::End {
+                return Err(self.fail("`}` to close the `workspace` block"));
+            }
+            let word = self.keyword(&["member", "root", "language", "facade", "use", "limit"])?;
+            // `use` and `limit` are whole statements and eat their own line end; the
+            // settings are one value each and do not.
+            match word.text.as_str() {
+                "member" => out.members.extend(self.paths("a member directory or glob")?),
+                "root" => out.root = Some(self.word("the source root directory")?),
+                "language" => out.language = Some(self.word("the language name")?),
+                "facade" => out.facade.extend(self.paths("a facade path")?),
+                "use" => {
+                    out.uses.push(self.uses(word)?);
+                    self.skip_blank();
+                    continue;
+                }
+                _ => {
+                    out.reach = Some(self.limit()?);
+                    self.skip_blank();
+                    continue;
+                }
+            }
+            self.endline()?;
+            self.skip_blank();
+        }
+        let close = self.bump();
+        self.endline()?;
+        if out.members.is_empty() {
+            return Err(self.at(
+                &close,
+                "a `workspace` block with no `member` — name the packages that hang off \
+                 this file, or the block governs nothing",
+            ));
+        }
+        Ok(out)
     }
 
     fn package(&mut self, lead: &Token) -> Result<Package, Fault> {
         let name = self.word("the package name")?;
-        self.block(lead)?;
         let (mut root, mut language) = (None, None);
         let (mut facade, mut exclude) = (Vec::new(), Vec::new());
+        // The block is optional because a member of a workspace can have nothing to put
+        // in it, and a mandatory empty `{ }` is precisely the boilerplate the workspace
+        // was written to delete.
+        if self.head().kind != Kind::Open {
+            self.endline()?;
+            return Ok(Package { name, root, language, facade, exclude });
+        }
+        self.block(lead)?;
         while self.head().kind != Kind::Close {
             if self.head().kind == Kind::End {
                 return Err(self.fail("`}` to close the `package` block"));
@@ -336,7 +469,7 @@ impl Reader<'_> {
     /// `use MODULE… [by SCOPE…]` — what this package may reach outside itself.
     ///
     /// Several modules may share one line because they usually share one reason
-    /// (`use gist irregex by face`), and an omitted `by` grants every zone, which is
+    /// (`use ledger hyper by face`), and an omitted `by` grants every zone, which is
     /// the common case and should cost one word.
     fn uses(&mut self, lead: Token) -> Result<Use, Fault> {
         let mut modules = vec![self.word("an outside module name")?];

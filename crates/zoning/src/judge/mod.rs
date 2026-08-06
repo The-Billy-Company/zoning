@@ -23,16 +23,22 @@
 //! variance, a zone matching no file, an `exclude` holding nothing back — lands in
 //! [`Verdict::stale`], which no variance can silence. That is what makes the
 //! exception list shrink as debt is paid, instead of accreting as folklore.
+//!
+//! One claim does not fit on one bench: a grant a package *inherited* is dead only when
+//! no member of the workspace exercises it, and a member cannot see its siblings. Those
+//! go out as [`Verdict::dormant`] and are settled by a [`Roll`].
 
 mod census;
 mod cycle;
 mod law;
+mod roll;
 
 use std::collections::HashSet;
 
 pub use census::{Census, Standing};
 pub use cycle::{condensation, tangles};
 pub use law::dir_of;
+pub use roll::{Dormant, Roll};
 // Path predicates the laws reason with. The map draws the same distinctions, and
 // two answers to "is this file inside that directory" is one answer too many.
 pub(crate) use law::inside;
@@ -69,6 +75,12 @@ pub struct Verdict {
     pub ratified: Vec<(Finding, String)>,
     /// Declarations the tree no longer supports. No variance can silence these.
     pub stale: Vec<String>,
+    /// Inherited grants this package never exercised, as written in the workspace.
+    ///
+    /// Not a verdict on its own — a shared grant is dead only when every member leaves
+    /// it dormant, and that intersection can only be taken once the run has judged them
+    /// all. Absent from [`Verdict::ok`] for exactly that reason.
+    pub dormant: Vec<String>,
     /// Advisory cartography: what the contract could govern but does not yet.
     pub census: Census,
 }
@@ -90,6 +102,7 @@ pub fn judge(survey: &Survey, ordinance: &Ordinance) -> Verdict {
         findings: Vec::new(),
         ratified: Vec::new(),
         stale: Vec::new(),
+        dormant: Vec::new(),
         used: HashSet::new(),
     };
 
@@ -128,6 +141,7 @@ pub fn judge(survey: &Survey, ordinance: &Ordinance) -> Verdict {
         findings: bench.findings,
         ratified: bench.ratified,
         stale: bench.stale,
+        dormant: bench.dormant,
     }
 }
 
@@ -138,6 +152,7 @@ struct Bench<'a> {
     findings: Vec<Finding>,
     ratified: Vec<(Finding, String)>,
     stale: Vec<String>,
+    dormant: Vec<String>,
     used: HashSet<(Law, String)>,
 }
 

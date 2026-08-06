@@ -40,6 +40,10 @@ analyse = "analyse"
 reorganises = "reorganises"
 recognises = "recognises"
 judgement = "judgement"
+honour = "honour"
+honours = "honours"
+organised = "organised"
+labelled = "labelled"
 # A valid alternate spelling this codebase's own error variant uses.
 unparseable = "unparseable"
 # The vim modeline option for "no expandtab", not a misspelling of "note".
