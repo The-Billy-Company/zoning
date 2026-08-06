@@ -38,14 +38,13 @@ workspace's `Cargo.toml`.
   file was written. `.vscode/{settings,extensions,tasks}.json` gives a contributor the same
   watcher/search excludes, formatter bindings, and one-click cargo/dogfood/deny/editor tasks the
   siblings ship, adapted off Rust rather than Zig as the primary language.
-- zoning shipped without the governance and hygiene layer its sibling repos (`gist`, `relate`,
-  `blast`, `irregex`) already carry: no `CODE_OF_CONDUCT.md`, `SECURITY.md`, or
-  `CONTRIBUTING.md`, no issue or pull-request templates or `CODEOWNERS`, no
-  `labels.json`/`triage.py` triage automation, and no `.typos.toml` / `.taplo.toml` /
-  `.yamllint` / `.editorconfig-checker.json` / `.mise.toml` to hold the parts of the tree that
-  aren't Rust to the same bar as the parts that are. Filing against this repo meant a
-  different experience than filing against a sibling for no reason but that nobody had
-  written the second one down yet.
+- zoning shipped without the governance and hygiene layer its sibling repos already carry:
+  no `CODE_OF_CONDUCT.md`, `SECURITY.md`, or `CONTRIBUTING.md`, no issue or pull-request
+  templates or `CODEOWNERS`, no `labels.json`/`triage.py` triage automation, and no
+  `.typos.toml` / `.taplo.toml` / `.yamllint` / `.editorconfig-checker.json` / `.mise.toml`
+  to hold the parts of the tree that aren't Rust to the same bar as the parts that are.
+  Filing against this repo meant a different experience than filing against a sibling for
+  no reason but that nobody had written the second one down yet.
 
   All of it is written now, specific to what zoning actually is rather than copied verbatim.
   `SECURITY.md`'s threat model covers a false verdict, glob semantics silently diverging from
@@ -254,7 +253,7 @@ workspace's `Cargo.toml`.
   down started dialing an HTTP client, and in the languages this tool exists for, that
   is the dependency that ends up hardest to remove.
 
-  So: `use <module> [by <zone>…]`. A named import the build resolves - `irregex`,
+  So: `use <module> [by <zone>…]`. A named import the build resolves - `hyper`,
   `build_options`, later `requests` - now needs a grant, and the grant carries a scope,
   because "the CLI face may talk to the network" and "any file in this package may talk
   to the network" are different architectures that used to be spelled the same way.
@@ -266,7 +265,7 @@ workspace's `Cargo.toml`.
   declaring it would bury the handful of grants that are actually decisions.
 
   One ergonomic thing I got wrong the first time and want written down. The first
-  implementation reported the law per import site, so a package importing `irregex` from
+  implementation reported the law per import site, so a package importing `hyper` from
   a hundred and thirty files got a hundred and thirty findings for one missing line -
   technically accurate, and a report nobody would read. It also priced a single
   undeclared decision as a hundred and thirty violations in a burndown, which is the
@@ -286,7 +285,7 @@ workspace's `Cargo.toml`.
   which is where its contract lives. The obvious fix is an allowlist, and an allowlist is
   a hardcoded list of exceptions that drifts the moment somebody vendors a second thing.
   So the dialect reads the manifest instead. `build.zig.zon` spells a vendored dependency
-  `.brigade = .{ .path = "brigade" }`, and a build that had not said so would not link -
+  `.vendor = .{ .path = "vendor" }`, and a build that had not said so would not link -
   the fact is already written down, load-bearing, and maintained by the compiler. Coverage
   just reads it.
 

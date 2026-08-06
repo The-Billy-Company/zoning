@@ -7,8 +7,12 @@ actually breaks one (drop a seal, drop a guest list, lower the reach ceiling,
 un-ratify a cycle) and requires the two implementations to produce the *same set
 of findings*, law by law, file by file.
 
+The contracts are whichever ones the surrounding workspace holds, swept rather
+than named, so this file carries no list of packages to keep in step.
+
 Usage:
     tools/differential.py --python /path/to/python3.14 --ward /path/to/ward-pkg
+    tools/differential.py --ward /path/to/ward-pkg --contract ../acme/acme.zone
 """
 
 from __future__ import annotations
@@ -23,19 +27,53 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ZONING = HERE.parent / "target" / "release" / "zoning"
-WORKSPACE = HERE.parent.parent
+REPO = HERE.parent
+ZONING = REPO / "target" / "release" / "zoning"
+WORKSPACE = REPO.parent
 
-# Every governed package, as (repo-relative contract, module tree to hang beside it).
-CONTRACTS = [
-    ("irregex", "irregex/contract/irregex.zone"),
-    ("gist", "gist/contract/gist.zone"),
-    ("relate", "relate/contract/relate.zone"),
-    ("blast", "blast/contract/blast.zone"),
-    ("billog", "billy/libs/kernels/billog/contract/billog.zone"),
-    ("lamina", "billy/libs/kernels/lamina/contract/lamina.zone"),
-    ("principia", "billy/libs/kernels/principia/contract/principia.zone"),
-]
+# Directories a sweep never enters, so discovery stays cheap in a large tree.
+SKIP = {
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "target",
+    "vendor",
+    "zig-cache",
+    "zig-out",
+    "zig-pkg",
+}
+
+
+def discover(root: Path, depth: int = 6) -> list[tuple[str, Path]]:
+    """Every governed package under `root`, found rather than listed.
+
+    A contract sits at the root it governs (`acme/acme.zone`) or in that root's
+    drawer (`acme/contract/acme.zone`); both spellings resolve to the same anchor,
+    so a sweep accepts either and names no package in this file. This repository
+    is skipped: its own fixtures are contracts written to fail, not packages.
+    """
+    found: dict[str, Path] = {}
+    stack = [(str(root), 0)]
+    while stack:
+        here, level = stack.pop()
+        with os.scandir(here) as entries:
+            for entry in entries:
+                if entry.name.startswith(".") or entry.name in SKIP:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    if level < depth and entry.path != str(REPO):
+                        stack.append((entry.path, level + 1))
+                elif entry.name.endswith(".zone"):
+                    found.setdefault(entry.name[: -len(".zone")], Path(entry.path))
+    return sorted(found.items())
+
+
+def anchor(contract: Path) -> Path:
+    """The directory a contract governs, under either layout."""
+    return (
+        contract.parents[1] if contract.parent.name == "contract" else contract.parent
+    )
 
 
 def mutations(text: str) -> dict[str, str]:
@@ -132,6 +170,13 @@ def main() -> int:
     ap.add_argument(
         "--ward", required=True, help="directory containing the `ward` package"
     )
+    ap.add_argument(
+        "--contract",
+        action="append",
+        type=Path,
+        metavar="PATH",
+        help="a contract to mutate; repeatable. Default: sweep the workspace.",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -139,16 +184,27 @@ def main() -> int:
         print(f"build first: cargo build --release ({ZONING} missing)", file=sys.stderr)
         return 2
 
+    contracts = (
+        [(path.resolve().stem, path.resolve()) for path in args.contract]
+        if args.contract
+        else discover(WORKSPACE)
+    )
+    if not contracts:
+        print(f"no contract found under {WORKSPACE}", file=sys.stderr)
+        return 2
+
     checked = agreed = 0
     disagreements: list[str] = []
 
-    for name, rel in CONTRACTS:
-        source = WORKSPACE / rel
+    for name, source in contracts:
         if not source.exists():
-            print(f"skip {name}: no {rel}")
+            print(f"skip {name}: no {source}")
             continue
         text = source.read_text()
-        module_root = source.parent.parent / declared_root(text)
+        module_root = anchor(source) / declared_root(text)
+        if not module_root.is_dir():
+            print(f"skip {name}: no module root at {module_root}")
+            continue
 
         for label, mutated in mutations(text).items():
             with tempfile.TemporaryDirectory() as tmp:
