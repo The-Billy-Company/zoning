@@ -35,8 +35,10 @@ pub(super) fn capabilities() -> Value {
         "documentFormattingProvider": true,
         "renameProvider": {"prepareProvider": true},
         "codeActionProvider": true,
+        // Only what the server actually paints. Comments and strings are the grammar's, and a
+        // legend entry nothing ever emits is a promise a client has no way to test.
         "semanticTokensProvider": {
-            "legend": {"tokenTypes": ["keyword", "type", "string", "comment"], "tokenModifiers": []},
+            "legend": {"tokenTypes": ["keyword", "type"], "tokenModifiers": []},
             "full": true
         }
     })
@@ -261,6 +263,10 @@ fn zone_names(text: &str) -> Vec<&str> {
         .collect()
 }
 
+/// The token types this server paints, in the order the legend declares them.
+const KEYWORD: u32 = 0;
+const TYPE: u32 = 1;
+
 fn semantic_tokens(documents: &HashMap<String, String>, params: &Value) -> Vec<u32> {
     let Some(text) = document_text(documents, params) else {
         return Vec::new();
@@ -269,21 +275,58 @@ fn semantic_tokens(documents: &HashMap<String, String>, params: &Value) -> Vec<u
     let mut previous_start = 0;
     let mut data = Vec::new();
     for (line, source) in text.lines().enumerate() {
-        let Some((start, keyword)) = KEYWORDS
-            .iter()
-            .filter_map(|(keyword, _)| source.find(keyword).map(|start| (start, *keyword)))
-            .min_by_key(|(start, _)| *start)
-        else {
-            continue;
-        };
-        let line_delta = line as u32 - previous_line;
-        let start = utf16_column(source, start) as u32;
-        let start_delta = if line_delta == 0 { start - previous_start } else { start };
-        data.extend([line_delta, start_delta, keyword.encode_utf16().count() as u32, 0, 0]);
-        previous_line = line as u32;
-        previous_start = start;
+        // Only the code half of the line. An editor layers semantic tokens over the
+        // grammar's own scopes, so a keyword token inside a comment does not merely add
+        // nothing — it repaints comment text in keyword colour.
+        let code = source.split_once("//").map_or(source, |(before, _)| before);
+        for (start, word, kind) in painted(code) {
+            let line_delta = line as u32 - previous_line;
+            let start = utf16_column(source, start) as u32;
+            let start_delta = if line_delta == 0 { start - previous_start } else { start };
+            data.extend([line_delta, start_delta, word.encode_utf16().count() as u32, kind, 0]);
+            previous_line = line as u32;
+            previous_start = start;
+        }
     }
     data
+}
+
+/// What is worth painting on one line of code, left to right.
+///
+/// Whole words only. A keyword found by substring lands inside the paths that contain it —
+/// `packages/**` would come back carrying a `package` keyword across its first seven
+/// characters — and a keyword list alone cannot tell `seal engine through …`, where the word
+/// opens a statement, from `variance seal …`, where the same word names a law. Only the word
+/// after `variance` can be a law, so that is the one place it is looked for.
+fn painted(code: &str) -> impl Iterator<Item = (usize, &str, u32)> {
+    let mut after_variance = false;
+    words(code).filter_map(move |(start, word)| {
+        let law = after_variance && Law::parse(word).is_some();
+        after_variance = word == "variance";
+        if law {
+            Some((start, word, TYPE))
+        } else if KEYWORDS
+            .iter()
+            .flat_map(|(keyword, _)| keyword.split_whitespace())
+            .any(|keyword| keyword == word)
+        {
+            Some((start, word, KEYWORD))
+        } else {
+            None
+        }
+    })
+}
+
+/// The whitespace-separated words of `code`, each with the byte it starts at.
+fn words(code: &str) -> impl Iterator<Item = (usize, &str)> {
+    code.char_indices()
+        .filter(|&(at, c)| {
+            !c.is_whitespace() && code[..at].chars().next_back().is_none_or(char::is_whitespace)
+        })
+        .map(|(at, _)| {
+            let end = code[at..].find(char::is_whitespace).map_or(code.len(), |gap| at + gap);
+            (at, &code[at..end])
+        })
 }
 
 fn document_text<'a>(documents: &'a HashMap<String, String>, params: &Value) -> Option<&'a str> {
