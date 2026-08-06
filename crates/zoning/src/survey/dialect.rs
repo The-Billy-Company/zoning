@@ -30,9 +30,9 @@ pub trait Dialect: Sync {
 
     /// Filenames that mark a directory as a package root in this language.
     ///
-    /// Only [`list`](crate::ordinance::packages) reads these, to answer which
-    /// packages exist at all — the question a governed-only report cannot answer,
-    /// and the one that says whether adoption is finished.
+    /// Only [`ordinance::parcels`](crate::ordinance::parcels) reads these, to answer
+    /// which packages exist at all — the question a governed-only report cannot
+    /// answer, and the one that says whether adoption is finished.
     fn manifests(&self) -> &'static [&'static str];
 
     /// Directories a manifest's own text declares as dependencies living in-tree.

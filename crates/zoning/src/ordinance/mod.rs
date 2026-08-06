@@ -30,7 +30,7 @@
 //! `use` is the only declaration pointing outward. Everything else here partitions
 //! and orders files this package owns; a `use` names something it does not own and
 //! says which of its zones may depend on it. The language's own always-available
-//! modules are [`Dialect::ambient`](crate::survey::Dialect::ambient) and need no
+//! modules are [`Dialect::ambient`] and need no
 //! grant, so a `use` line appears exactly where a real outside dependency does.
 
 mod fault;
