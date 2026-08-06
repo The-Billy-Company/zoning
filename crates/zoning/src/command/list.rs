@@ -55,7 +55,7 @@ pub(super) fn list(
             let name = declared(&dir, dialect).unwrap_or_else(|| basename(root, &parcel.dir));
             let found = probe(&dir, source, dialect, tracked, &inside, &name);
             // A package with no source of its own is not a gap in coverage. Build-time
-            // chassis packages exist, and so do trees whose only content is a nested
+            // scaffolding packages exist, and so do trees whose only content is a nested
             // dependency — telling somebody to draft a contract for either is telling
             // them to write a file that would govern nothing.
             if found.files.is_empty() {

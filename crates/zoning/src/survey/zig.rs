@@ -64,8 +64,8 @@ impl Dialect for Zig {
         out
     }
 
-    // `.name = .irregex` since Zig 0.14 made it an enum literal; older manifests spell
-    // it `.name = "irregex"`. Both are read, because a tree does not upgrade its
+    // `.name = .acme` since Zig 0.14 made it an enum literal; older manifests spell
+    // it `.name = "acme"`. Both are read, because a tree does not upgrade its
     // manifests the day the compiler changes and a contract named after the wrong thing
     // is worse than one named after the directory.
     fn declared(&self, manifest: &str) -> Option<String> {
@@ -219,27 +219,27 @@ const e = @import(comptime_value);
     fn reads_in_tree_dependencies_and_not_the_publish_paths() {
         let zon = "\
 .{
-    .name = .chassis,
+    .name = .acme,
     .dependencies = .{
-        // .brigade = .{ .path = \"commented\" },
-        .brigade = .{ .path = \"brigade\" },
+        // .vendor = .{ .path = \"commented\" },
+        .vendor = .{ .path = \"vendor\" },
         .fetched = .{ .url = \"https://example/x.tar.gz\", .hash = \"…\" },
     },
-    .paths = .{ \"build.zig\", \"brigade\", \"README.md\" },
+    .paths = .{ \"build.zig\", \"vendor\", \"README.md\" },
 }
 ";
-        assert_eq!(Zig.vendored(zon), ["brigade"]);
+        assert_eq!(Zig.vendored(zon), ["vendor"]);
     }
 
     #[test]
     fn reads_the_declared_name_in_either_spelling() {
         // Zig 0.14 onward, and what every current manifest here spells.
         assert_eq!(
-            Zig.declared(".{ .name = .irregex, .version = \"0.1.0\" }").as_deref(),
-            Some("irregex")
+            Zig.declared(".{ .name = .acme, .version = \"0.1.0\" }").as_deref(),
+            Some("acme")
         );
         // Before it, and still on disk in trees that have not moved.
-        assert_eq!(Zig.declared(".{ .name = \"irregex\" }").as_deref(), Some("irregex"));
+        assert_eq!(Zig.declared(".{ .name = \"acme\" }").as_deref(), Some("acme"));
         // `.name` is the first key by convention but not by rule, and a commented-out one
         // must not win — the same prose discipline the import lexer uses.
         let zon = "\
@@ -258,6 +258,6 @@ const e = @import(comptime_value);
     fn a_named_module_is_not_a_path() {
         assert!(Zig.is_local("a/b.zig"));
         assert!(!Zig.is_local("std"));
-        assert!(!Zig.is_local("irregex"));
+        assert!(!Zig.is_local("acme"));
     }
 }

@@ -15,7 +15,7 @@ use super::Tracked;
 ///
 /// Two completions keep that from ever being a surprise. A directory with nothing
 /// governed beneath it looks *up* for the package that encloses it, so a question asked
-/// from `src/kernel/regex` is still answered by the contract that governs it. And an
+/// from `src/core/parser` is still answered by the contract that governs it. And an
 /// explicit `--root` never climbs: a caller who names the subtree means it, including
 /// when the answer is "nothing here".
 ///

@@ -179,9 +179,9 @@ fn stack(survey: &Survey, package: &str, facade: Option<&str>) -> Vec<(String, V
         .collect();
 
     // The package's own name belongs to the loose files at the module root and to nothing
-    // else. Reserving it either way is what keeps `use outliner by outliner` — a module
+    // else. Reserving it either way is what keeps `use acme by acme` — a module
     // name beside a zone name that happen to be the same word — from ever being written:
-    // a `surface/face/outliner` directory becomes `face_outliner` instead, and if there
+    // a `surface/face/acme` directory becomes `face_acme` instead, and if there
     // *are* root files, they get the word that was always right for them rather than
     // losing a race to whichever zone the topological order put first.
     let mut names: Vec<String> = vec![String::new(); groups.len()];
@@ -228,9 +228,9 @@ fn holds(survey: &Survey, dir: &str, facade: Option<&str>) -> bool {
 /// which is the only outcome that helps.
 ///
 /// A lone directory takes the word its author already chose. Two can share a last
-/// segment — `surface/face/outliner` beside a package root also called `outliner` — and
+/// segment — `surface/face/acme` beside a package root also called `acme` — and
 /// two zones with one name is a contract that cannot be read, so the loser widens to its
-/// parent segment (`face_outliner`) before anything as meaningless as a number appears.
+/// parent segment (`face_acme`) before anything as meaningless as a number appears.
 fn distinct(group: &[String], package: &str, taken: &mut BTreeSet<String>) -> String {
     let name = match group {
         [one] => (1..=3)
