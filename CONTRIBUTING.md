@@ -189,10 +189,32 @@ ci: the changelog fold's quiet-check compared the wrong tree
 ```
 
 Prefixes in use: `feat` `fix` `perf` `refactor` `docs` `test` `build` `ci`
-`chore`. Keep the subject under about 72 characters and put the reasoning in
-the body, where reviewers and `git log` both find it. The subject line becomes
-the squash commit message, which is what release-please reads to decide the
-next version — an unconventional title is not a style nit.
+`chore` `deps`. Keep the subject under about 72 characters and put the
+reasoning in the body, where reviewers and `git log` both find it. The subject
+line becomes the squash commit message, which is what release-please reads to
+decide the next version — an unconventional title is not a style nit.
+
+That decision is plain semver over those prefixes, with no thumb on the scale:
+
+| In the window since the last tag | Next version |
+|---|---|
+| any `!` or a `BREAKING CHANGE:` footer | major |
+| any `feat` | minor |
+| anything else — `fix`, `perf`, `refactor`, `ci`, … | patch |
+
+So a release is only a minor because someone shipped a feature in it. If you
+need an exact number the rules would not pick — a patch on a minor nobody cut,
+or a version chosen to line up with a consumer's pin — put a `Release-As:`
+footer in the commit body and it overrides all of the above:
+
+```text
+feat: name the package a listing governs, not the file it was written in
+
+Release-As: 1.3.1
+```
+
+The newest such footer in the window wins. Use it deliberately; a version that
+skips a number is a question every downstream reader has to answer once.
 
 For the pull request: one concern per PR, describe what would have caught the
 bug if it had existed, and fill in the template. Reviews here ask three
