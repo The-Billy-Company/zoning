@@ -139,7 +139,9 @@ pub(crate) fn grow(d: &mut Dice, at: &Path, tangled: bool) -> Grown {
         for (alias, (_, to)) in edges.iter().filter(|(from, _)| *from == index).enumerate() {
             let _ = writeln!(text, "const p{alias} = @import(\"{}\");", spec(rel, &files[*to]));
         }
-        for (alias, (_, module_name)) in outsiders.iter().filter(|(from, _)| *from == index).enumerate() {
+        for (alias, (_, module_name)) in
+            outsiders.iter().filter(|(from, _)| *from == index).enumerate()
+        {
             let _ = writeln!(text, "const o{alias} = @import(\"{module_name}\");");
         }
         text.push_str("pub const value: usize = 1;\n");

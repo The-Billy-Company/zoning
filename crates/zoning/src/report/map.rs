@@ -66,7 +66,7 @@ pub fn map(ordinance: &Ordinance, survey: &Survey, ink: Ink) -> String {
             "{:>3} │ {:<name_width$} {dim}{bar}{reset} {count:>count_width$} {dim}{arrow}{reset}{mark} {dim}{}{reset}",
             zone.rank,
             truncate(&zone.name, name_width),
-            truncate(
+            truncate_words(
                 &zone.paths.to_string(),
                 RULE.saturating_sub(name_width + BAR + count_width + 16)
             ),
@@ -123,4 +123,35 @@ fn truncate(text: &str, width: usize) -> String {
     }
     let head: String = text.chars().take(width.saturating_sub(1)).collect();
     format!("{head}…")
+}
+
+/// [`truncate`], but for a space-separated list of file names — dropping a whole
+/// word instead of slicing through it.
+///
+/// A width-cut `syn…` reads as a typo, not as "and more files that didn't fit":
+/// `syntax.zig` and `syncopate.zig` truncate to the same three letters, so the
+/// glyph that is supposed to say "there is more" instead erases the one piece
+/// of information (which file) a reader came here for.
+fn truncate_words(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_owned();
+    }
+    let mut out = String::new();
+    for word in text.split(' ') {
+        let grown = out.chars().count() + usize::from(!out.is_empty()) + word.chars().count();
+        // Room is reserved for " …" up front rather than trimmed after, so the
+        // marker itself never becomes the character that overflows the column.
+        if grown > width.saturating_sub(2) {
+            break;
+        }
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(word);
+    }
+    if out.is_empty() {
+        return truncate(text, width);
+    }
+    out.push_str(" …");
+    out
 }

@@ -80,7 +80,7 @@ pub fn auto() {
     }
     if let Ok(lines) = execute_in(Action::Run, &home) {
         for line in lines {
-            eprintln!("zoning: {line}");
+            eprintln!("zone: {line}");
         }
     }
 }
@@ -94,6 +94,11 @@ fn execute_in(action: Action, home: &Path) -> Result<Vec<String>> {
             if editors.is_empty() {
                 return Ok(vec!["no supported editor detected; nothing changed".to_owned()]);
             }
+            // The slow door here is an editor's own CLI (`cursor
+            // --install-extension`, `--list-extensions`) — genuinely seconds,
+            // not milliseconds — so the spinner covers exactly this loop and
+            // stops before the lines it earned get printed.
+            let spinner = crate::spinner::Spinner::start("zone is setting up your editor");
             let mut lines = Vec::new();
             for editor in &editors {
                 install(home, *editor)?;
@@ -106,6 +111,7 @@ fn execute_in(action: Action, home: &Path) -> Result<Vec<String>> {
                     editors,
                 })?,
             )?;
+            spinner.stop();
             Ok(lines)
         }
         Action::Uninstall => {
