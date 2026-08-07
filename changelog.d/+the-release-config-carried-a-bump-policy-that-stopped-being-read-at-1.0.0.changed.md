@@ -8,8 +8,8 @@ still reading like a bump policy - and this repo had never cut a patch release,
 which made them look like the reason. They were not: every release window so
 far happened to carry exactly one `feat`.
 
-What actually decides the number is now a table in `CONTRIBUTING.md` - `!` or a
-BREAKING CHANGE footer takes the major, `feat` takes the minor, everything else
-takes the patch - along with the `Release-As: X.Y.Z` footer, which pins an exact
-version when the rules would not pick it and which was previously written down
-nowhere.
+What actually decides the number is now written down: `!` or a BREAKING CHANGE
+footer takes the major, `feat` takes the minor, everything else takes the patch,
+said in `CONTRIBUTING.md` where you pick a prefix and in full in the org
+standard, alongside the `Release-As: X.Y.Z` footer that pins an exact version
+when the rules would not pick it and which was previously documented nowhere.
