@@ -88,8 +88,16 @@ pub(super) fn list(
         for path in &parcel.contracts {
             governed += 1;
             let shown = path.strip_prefix(root).unwrap_or(path);
-            let name =
-                path.file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+            // The package the contract declares, not the file it was written in. A tree
+            // that names every contract for its package says the same word twice here,
+            // and a tree that gives them all one conventional name — `charter.zone`,
+            // `kernel.zone` — says nothing at all. The stem is the fallback for a
+            // contract too malformed to read, where a name is the one thing to salvage.
+            let name = ordinance::Ordinance::read(path, options.language)
+                .map(|contract| contract.package)
+                .ok()
+                .or_else(|| path.file_stem().map(|s| s.to_string_lossy().into_owned()))
+                .unwrap_or_default();
             let _ = writeln!(out, "  {green}governed{reset}    {name:<14} {}", shown.display());
         }
     }

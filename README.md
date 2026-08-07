@@ -38,9 +38,9 @@ in a `.zone` file, and the tool judges that declaration against the real
 `@import` graph.
 
 ```
-✗ zone [irregex]: 310 files, 1436 imports, 2 violation(s), 3 allowed
-src/kernel/regex/glean/differential_test.zig:32:1: [zone] zone `regex` imports up into `query` (`kernel/query/query.zig`) — imports may only point down the stack
-src/exec/cold/emit/render.zig:31:1: [seal] reaches past the seal on `kernel/scan/` into `kernel/scan/simd.zig` — enter through `kernel/scan/scan.zig`
+✗ zone [acme]: 310 files, 1436 imports, 2 violation(s), 3 allowed
+src/core/parser/glean/check.zig:32:1: [zone] zone `parser` imports up into `query` (`core/query/query.zig`) — imports may only point down the stack
+src/runtime/cold/emit/render.zig:31:1: [seal] reaches past the seal on `core/scan/` into `core/scan/simd.zig` — enter through `core/scan/scan.zig`
 
 zone: Move the dependency down the stack, or ratify the edge with `variance zone … because "…"`.
 
@@ -173,17 +173,17 @@ package acme {
 zones {
     portal   portal.zig
     assay    assay/**
-    math     kernel/math/**
-    regex    kernel/regex/**
-    session  exec/session/**
+    math     core/math/**
+    parser   core/parser/**
+    session  runtime/session/**
     ffi      surface/ffi/**
 }
 
-seal kernel/regex through regex.zig     // enter a deep module by its door
+seal core/parser through parser.zig     // enter a deep module by its door
 keep surface/api.zig to root.zig        // and this region has a guest list
 
 use build_options                       // and these imports may leave
-use irregex by ffi
+use acme by ffi
 
 limit  reach to 5 hops
 forbid cycles across directories
@@ -208,6 +208,32 @@ that was the only layout zoning accepted before and contracts are checked in. A
 tool does not get to invalidate a repository's on-disk shape to tidy its own
 rules. Both spellings resolve to the same anchor and nothing downstream can tell
 them apart; `zone draft --write` only mints the first.
+
+### What To Call It
+
+The filename is yours. Identity lives in the `package` block, which is what
+every verdict, every `--package` filter, and every workspace lookup reads, so
+nothing downstream ever asks what the file was called. `zone draft --write`
+mints `<name>.zone` because a first contract has to be called something and the
+package's own name is the one guess that is never wrong.
+
+Once a tree has more than one, naming each after its package stops paying. The
+name is already in the file, on the first line, and it is already in the path;
+spending the filename on a third copy means every contract in the fleet has a
+different name for the same kind of document. Naming it for the *role* instead
+gives you one word you can grep, one word a reviewer recognises across
+repositories, and a filename that survives the package being renamed:
+
+| Shape | Call it | Because |
+|---|---|---|
+| A repository that is one package | `charter.zone` at the repo root | one name across every repo, so "where is the contract" has one answer |
+| A package nested in a bigger tree | what the package *is* — `kernel.zone`, `service.zone`, `binding.zone` | the path already says which one; the name says what kind |
+| A workspace holding shared defaults | `charter.zone` at the workspace root | members carry their own role names beneath it |
+
+None of this is enforced, and it is not meant to be — a tool that dictated
+filenames would be back to demanding a directory. It is what the sibling repos
+this was written for settled on after every one of them had a contract named
+after its own binary.
 
 `.zone` is also BIND's extension for DNS data, and now that a contract sits
 where a nameserver file might, the extension cannot be what identifies one. So a
@@ -315,7 +341,7 @@ governs the ones that leave:
 
 ```
 use build_options            // anywhere in the package
-use tokio by session cold    // only these zones
+use httpx by session cold    // only these zones
 ```
 
 That scope is the reason the law exists. "The CLI face may talk to the network"
@@ -356,8 +382,8 @@ Every exception is a `variance`, and every variance must carry a reason:
 
 ```
 variance cycle {
-    exec/cold/engine/serial.zig
-    exec/cold/engine/swarm/swarm.zig
+    runtime/cold/engine/serial.zig
+    runtime/cold/engine/swarm/swarm.zig
 } because
         \\Work distribution recursion: `serial` hands a multi-file query to
         \\`swarm`, and each swarm worker runs the identical per-file path back
@@ -403,17 +429,17 @@ the file and wonder.
 the page" stops being a rule you memorise and becomes a thing you can see:
 
 ```
-zone map · irregex · 26 zones, high to low
+zone map · acme · 26 zones, high to low
 ──────────────────────────────────────────────────────────────────────────
  25 │ ffi      ██············  7 ↓5      surface/ffi/**
  24 │ api      █·············  2 ↓3    ⊘ surface/api.zig surface/api_test.…
- 23 │ session  ██████········ 35 ↓13  ⊙  exec/session/**
- 22 │ cold     ███████······· 44 ↓16  ⊙  exec/cold/**
+ 23 │ session  ██████········ 35 ↓13  ⊙  runtime/session/**
+ 22 │ cold     ███████······· 44 ↓16  ⊙  runtime/cold/**
  21 │ cli      █·············  6 ↓4      surface/cli/**
   …
-  8 │ regex    ██████████████ 92 ↓4   ⊙  kernel/regex/**
-  7 │ scan     ███··········· 16 ↓4      kernel/scan/**
-  5 │ math     ███··········· 18 ↓3      kernel/math/**
+  8 │ parser   ██████████████ 92 ↓4   ⊙  core/parser/**
+  7 │ scan     ███··········· 16 ↓4      core/scan/**
+  5 │ math     ███··········· 18 ↓3      core/math/**
   3 │ fault    █·············  1 ↓1      fault.zig
   2 │ assay    █·············  5      ⊙  assay/**
   1 │ portal   █·············  1         portal.zig
@@ -468,8 +494,8 @@ The question you actually have day to day is narrower, and `explain` answers it
 without a contract edit or a full run:
 
 ```bash
-zone explain src/exec/cold/emit/render.zig            # where does this file stand?
-zone explain src/kernel/math/sqrt.zig src/portal.zig  # may I write this import?
+zone explain src/runtime/cold/emit/render.zig         # where does this file stand?
+zone explain src/core/math/sqrt.zig src/portal.zig    # may I write this import?
 ```
 
 The second form works whether or not the import exists yet, which is the point:
@@ -531,7 +557,7 @@ is a package by every test this tool can run — manifest, source, an import gra
 and it is nonetheless not yours: its architecture is decided in the repository it
 came from, which is where its contract lives. The obvious fix is an allowlist,
 which drifts the moment somebody vendors a second thing, so the dialect reads the
-manifest instead. `build.zig.zon` spells one `.brigade = .{ .path = "brigade" }`,
+manifest instead. `build.zig.zon` spells one `.vendor = .{ .path = "vendor" }`,
 and a build that had not said so would not link. The fact is already written down
 and the compiler maintains it.
 
