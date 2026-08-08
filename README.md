@@ -225,7 +225,7 @@ gives you one word you can grep, one word a reviewer recognises across
 repositories, and a filename that survives the package being renamed:
 
 | Shape | Call it | Because |
-|---|---|---|
+| --- | --- | --- |
 | A repository that is one package | `charter.zone` at the repo root | one name across every repo, so "where is the contract" has one answer |
 | A package nested in a bigger tree | what the package *is* — `kernel.zone`, `service.zone`, `binding.zone` | the path already says which one; the name says what kind |
 | A workspace holding shared defaults | `charter.zone` at the workspace root | members carry their own role names beneath it |
