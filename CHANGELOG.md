@@ -6,6 +6,205 @@ workspace's `Cargo.toml`.
 
 <!-- towncrier release notes start -->
 
+## [1.3.1] - 2026-08-08
+
+### Added
+
+- A run that has to shell out to an editor's own CLI — `cursor --install-extension`,
+  `--list-extensions` — genuinely costs seconds, and the first-use setup did that with
+  nothing on screen, so a terminal that had gone quiet for a few seconds looked identical
+  to one that had hung. The main verbs had the same gap on a slow disk or a large `--under`
+  sweep: silence while `verify`/`status`/`show`/`map` read every contract, then the whole
+  report at once.
+
+  Both now start a small braille spinner on standard error the moment there is real work
+  to do, and stop it — clearing the line — the instant an answer is ready to print. It
+  costs nothing on the fast path: nothing renders until the call has run for 150ms, so a
+  `map` over a handful of small packages never draws a frame it would have to immediately
+  erase. Off a terminal, under `CI`, or with `ZONING_NO_SETUP` set, it never spawns a
+  thread at all — the report and its exit code are unchanged either way, and stdout never
+  carries a spinner byte.
+- `use` is the one law newer than `tools/differential.py`: it has no Python twin
+  in the implementation this was rewritten from, so the parity gate that catches
+  the other six laws disagreeing with their old selves had nothing to check it
+  against. It was pinned by hand-written fixtures alone — real coverage, but a
+  fixed handful of shapes next to a gate built to survive a person breaking a
+  contract in every way at once.
+
+  `tests/properties.rs` now grows randomized packages with real outside
+  imports, drafts a randomized grant table over them — some modules ungranted,
+  some unscoped, some scoped to a random subset of the package's zones — and
+  hand-computes which imports the law should refuse, independently of the code
+  under test. It plays the same role `the_cycle_law_finds_what_a_slower_algorithm_finds`
+  already played for `cycle`: an oracle that shares no logic with the judge,
+  run at a scale a fixture file cannot reach. `use` is load-bearing in CI on the
+  same footing as the other six now.
+- zoning could only read Zig, and Zig's total absence of a module system was the
+  whole reason the tool exists. Python is a different animal: `import a.b.c` and
+  `from a.b import c` already resolve dotted names against real files, and
+  `sys.path` already draws a boundary. What that graph has never said is which
+  of *your* packages may reach which — the same question a zone stack answers,
+  at a grain the language's own boundary is too coarse to draw.
+
+  The new `python` dialect reads that graph on its own terms rather than
+  borrowing Zig's: dotted names resolve to a leaf module or a package's
+  `__init__.py`, a relative import's leading dots climb exactly as many
+  directories as they count regardless of how deep the `from` nests, and
+  `pyproject.toml` supplies both the package's declared name and its
+  `path = "…"` vendored dependencies, the same authority `build.zig.zon` carries
+  for a vendored Zig one. The standard-library grant is drawn from
+  `sys.stdlib_module_names` unioned across every CPython release still in
+  support rather than one interpreter's local answer, so a contract written
+  against 3.12 keeps meaning the same thing under 3.13 or 3.14 without an
+  edit.
+
+### Changed
+
+- A contract had to live in a `contract/` drawer, so a boundary tool asked every
+  package for a directory to hold one page — while the manifest, the formatter
+  config, and the CI config all sat at the root. And it had to say everything
+  itself: ten Zig kernels in one tree were ten copies of the same `root`,
+  `language`, and `facade`, which is not a cosmetic cost. Four lines nobody reads
+  are four lines nobody notices are wrong, and a repository-wide fact spelled
+  per-package will eventually disagree with itself in exactly one package and
+  pass.
+
+  A `.zone` file now governs the directory it sits in, so `acme/acme.zone`
+  is the whole layout. The drawer still resolves to the same anchor, because
+  contracts are checked in and a tool does not get to invalidate a repository's
+  on-disk shape to tidy its own rules; nothing downstream can tell the two apart,
+  and only `draft --write` picks a side. Since `.zone` is also BIND's extension
+  for DNS data and a contract now sits where a nameserver file might, identity
+  moved off the extension and onto the first declaration: a contract opens with
+  `package` or `workspace`, and a sweep walks past any `*.zone` that opens with
+  something else — a claim of authorship rather than a guess about content, and
+  only for sweeping, since a file named on the command line is still parsed and
+  still faults.
+
+  The shared part is now sayable once. A `workspace { member … }` block claims
+  packages below it and hands down `root`, `language`, `facade`, `use` grants, and
+  the reach ceiling; a member's own word always wins, and a member that agrees
+  with all of it writes `package hearth` with no block at all. The link points
+  down, the way `[workspace] members` and `[tool.uv.workspace]` do — a package is
+  a member because something above it said so, never because it declared a parent,
+  so nothing can quietly attach itself to a policy nobody granted it. What a
+  workspace deliberately cannot share is anything naming a file: zones, seals,
+  keeps, and variances are claims about one graph, and a blanket exception written
+  once for a whole monorepo is the accretion this language exists to prevent.
+
+  An inherited grant is judged against the whole membership rather than each
+  member, or sharing a line would be strictly worse than repeating it — one grant
+  of nine members would fail eight times. It is stale only when no member
+  exercises it, the report names the workspace that wrote it, and a run that saw
+  only part of the membership (`--under`, or a sibling that would not parse) says
+  nothing at all: absence of evidence across an unknown remainder is not evidence.
+- Release versioning is documented where you pick a commit prefix, and the two
+  settings that made it look like something other than semver are gone.
+
+  `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` sat in
+  `release-please-config.json` since before 1.0.0. release-please reads them only
+  while the version is below 1.0.0, so they have meant nothing since 1.0.0 while
+  still reading like a bump policy - and this repo had never cut a patch release,
+  which made them look like the reason. They were not: every release window so
+  far happened to carry exactly one `feat`.
+
+  What actually decides the number is now written down: `!` or a BREAKING CHANGE
+  footer takes the major, `feat` takes the minor, everything else takes the patch,
+  said in `CONTRIBUTING.md` where you pick a prefix and in full in the org
+  standard, alongside the `Release-As: X.Y.Z` footer that pins an exact version
+  when the rules would not pick it and which was previously documented nowhere.
+- `tools/differential.py` held a hardcoded table of seven contracts by name and
+  repo-relative path — the packages that happened to sit beside this one on the
+  machine it was written on. That is two problems in one line each. A public
+  repository shipped a list of somebody's private tree, and a contributor cloning
+  it got seven `skip` lines and a gate that proved nothing, with no hint that the
+  list was the thing to edit.
+
+  It sweeps the surrounding workspace instead, taking any `<pkg>/<pkg>.zone` or
+  `<pkg>/contract/<pkg>.zone` it finds and skipping this repository, whose own
+  fixtures are contracts written to fail rather than packages to check. Point it
+  somewhere specific with `--contract PATH`, repeatable. The list nobody could
+  keep in step is gone, and the documentation examples that named real packages
+  now name `acme`, like every other example here.
+- `zone list` names the package a contract declares rather than the file it was
+  written in.
+
+  The stem was a fine stand-in while every contract was named after its package,
+  because then the two were the same word. They are not the same word once a tree
+  adopts a convention: a fleet that calls every root contract `charter.zone` got a
+  column reading `charter  charter.zone`, which is the listing telling you what
+  you just read. The `package` block was always the authoritative name - it is
+  what a verdict header, a `--package` filter, and a workspace lookup all read -
+  so the listing now reads it too, and falls back to the stem only for a contract
+  too malformed to parse, where a name is the one thing left to salvage.
+
+  The README also writes the naming convention down, under `What To Call It`: one
+  name at a repository root, a role name for a package nested inside a bigger tree
+  (`kernel.zone`, `service.zone`), and nothing enforced either way. A tool that
+  dictated filenames would be back to demanding a directory.
+
+### Fixed
+
+- Four editors read `.zone` through four different runtimes - a TextMate grammar, a
+  Tree-sitter grammar with four queries, a Vim syntax file, and one language server behind
+  all of them - and the only thing CI asked of any of them was that it built. So the parts
+  that decide what you actually see on screen were the least checked code in the repo, and
+  they were wrong in five places nobody would have noticed by reading them.
+
+  `variance seal` painted `seal` as a statement keyword in Vim, in Zed, and in the server's
+  semantic tokens, because the word naming a law is spelled the same as the word opening a
+  statement. A `//` comment in Vim highlighted every keyword inside it, since the comment
+  rule was defined after the words it was supposed to swallow. Zone names like `floor.zig`
+  had no scope at all in VS Code, where Zed has painted them since the grammar shipped. The
+  server's semantic tokens matched keywords as substrings, so `package` lit up inside
+  `packages/**`, and the legend advertised five token types when the server only ever emits
+  two. VS Code's `increaseIndentPattern` only recognized one of the block forms the language
+  has, and nothing continued the line after `because`.
+
+  All five are fixed, and each of the four editors now has a suite that would have caught
+  its own: TextMate scopes tokenized through `vscode-textmate` exactly as the editor does,
+  Tree-sitter highlight annotations plus a pass requiring every query to still match what
+  Zed reads from it, `syntax.vim` assertions on the group at a line and column and what it
+  links to, and a protocol suite that answers every capability the server advertises - with
+  a gate that fails if `capabilities()` ever grows a sixth promise nothing keeps. The Vim
+  suites run under both `vim` and `nvim`, which disagree about enough to be worth it.
+- `--under` compared its argument to the sweep's rows as a string, and the sweep's
+  rows are repo-relative posix paths. So `--under libs/kernels` worked and `--under
+  ./libs/kernels` matched nothing — as did any absolute path, which is what a
+  shell's tab-completion hands you and what a CI script is entitled to write. The
+  failure mode is the worst one available to a gate: a narrowing to nothing reads
+  exactly like a clean tree, so `zone verify --under ./libs/kernels` judged no
+  package at all and exited 0.
+
+  The argument is now resolved as a place rather than compared as a spelling —
+  absolute, `./`-prefixed, and `.` itself all name the subtree they obviously mean,
+  and a path outside the tree being swept still narrows to nothing, because that is
+  what it means.
+- `draft` wrote `use module by` — a `by` clause with nothing after it — whenever
+  an outside module was imported only from the facade and never from any file a
+  zone actually covers. The facade has no zone to scope a grant to, so the
+  scope list came out empty, and an empty scope is not a legal grant: `zoning
+  verify` on the file `draft --write` had just produced refused to parse it.
+
+  The grant is now unscoped whenever any of its imports come from the facade —
+  `use module`, no `by` — the same shape a person would write by hand for a
+  dependency that isn't any one zone's business.
+- `zone explain FILE` decided which findings belonged to that file by checking
+  whether the finding's human-readable subject string started with the file's
+  path. That only holds by construction for a law whose subject already is
+  `"{file} -> {target}"`; `use`'s subject is `"{zone or facade} -> {module}"`,
+  which never starts with a file path, so a file with an ungranted import
+  always reported a clean standing while `zone verify` on the same package
+  listed it as broken. An unclaimed-zone violation had the identical gap
+  (`subject` there is `"unclaimed:{file}"`).
+
+  `explain` now matches a finding to a file by the finding's actual recorded
+  path instead of pattern-matching its prose, converted into the same
+  repo-relative coordinates `Finding.path` is already reported in. The new
+  `use`-law property test caught this by generating packages where it was
+  exercised for the first time at scale.
+
+
 ## [1.2.0] - 2026-08-05
 
 ### Added
