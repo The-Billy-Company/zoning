@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read as _;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 /// A package the tool can see: where it is, what language, and whether it is governed.
@@ -180,10 +180,54 @@ fn sweep(repo_root: &Path, under: &[String]) -> (Vec<PathBuf>, Vec<Parcel>) {
 fn narrowed(repo_root: &Path, under: &str) -> Option<String> {
     let named = Path::new(under);
     let full = if named.is_absolute() { named.to_path_buf() } else { repo_root.join(named) };
-    let full = full.canonicalize().unwrap_or(full);
-    let root = repo_root.canonicalize().unwrap_or_else(|_| repo_root.to_path_buf());
-    let rel = posix(full.strip_prefix(&root).ok()?);
+    let rel = posix(settled(&full).strip_prefix(settled(repo_root)).ok()?);
     Some(if rel.is_empty() { ".".to_owned() } else { rel })
+}
+
+/// A path resolved as far as the filesystem can answer, and lexically for the rest.
+///
+/// Both operands above have to be resolved by the *same* rule, and `canonicalize`
+/// alone is not one: it refuses a path that does not exist, and either operand is
+/// entitled to be one - a gate may be pointed at a directory somebody is about to
+/// add, and `..` may climb to somewhere nobody ever created. Falling back to the
+/// unresolved path is what made that dangerous, because `join` does not fold `..`
+/// away: `<root>/../elsewhere` still carried `<root>` as a literal prefix, so a
+/// sibling of the tree stripped as though it sat inside it and a gate aimed outside
+/// the tree answered "clean" instead of "not here". That went unseen because the one
+/// platform where it is caught by accident is macOS, whose temp dir canonicalizes
+/// `/var` to `/private/var` - the prefixes then disagree for a reason that has
+/// nothing to do with the `..`, and the same test passes for the wrong cause.
+///
+/// So: resolve the deepest ancestor that does exist, which is what makes a symlinked
+/// `/tmp` compare equal to its target, and fold the tail lexically, which is what
+/// keeps a path that points outside the tree outside it.
+fn settled(path: &Path) -> PathBuf {
+    let mut lexical = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !lexical.pop() {
+                    lexical.push(part);
+                }
+            }
+            named => lexical.push(named),
+        }
+    }
+    let mut tail = Vec::new();
+    let mut walk = lexical.as_path();
+    loop {
+        if let Ok(real) = walk.canonicalize() {
+            return tail.iter().rev().fold(real, |deep, name| deep.join(name));
+        }
+        match (walk.parent(), walk.file_name()) {
+            (Some(up), Some(name)) => {
+                tail.push(name);
+                walk = up;
+            }
+            _ => return lexical,
+        }
+    }
 }
 
 /// Every contract and manifest git can see, tracked or merely present.
@@ -355,5 +399,20 @@ mod tests {
         // narrows to nothing rather than to everything — the two ways this can fail open.
         assert_eq!(narrowed(tree, ".").as_deref(), Some("."));
         assert_eq!(narrowed(tree, "../elsewhere"), None);
+        // …and asked of a tree that is not reached through a symlink, which is the only
+        // place the last line above is a real question. macOS resolves its temp dir's
+        // `/var` to `/private/var`, so a climb out of the tree fails the prefix test there
+        // for a reason that has nothing to do with the climb — and the same assertion held
+        // on macOS while `<tree>/../elsewhere` stripped clean through on Linux. A fixture
+        // whose canonical path is itself keeps both platforms answering the same question.
+        let plain = fs::canonicalize(std::env::temp_dir())
+            .expect("a temp dir to resolve")
+            .join("zoning-narrowed-plain/libs/kernels");
+        fs::create_dir_all(&plain).expect("temp tree");
+        let bare = plain.parent().and_then(Path::parent).expect("two levels up");
+        assert_eq!(narrowed(bare, "libs/kernels").as_deref(), Some("libs/kernels"));
+        assert_eq!(narrowed(bare, ".").as_deref(), Some("."));
+        assert_eq!(narrowed(bare, "../elsewhere"), None);
+        assert_eq!(narrowed(bare, "libs/kernels/../../../elsewhere"), None);
     }
 }
