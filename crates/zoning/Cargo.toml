@@ -5,8 +5,8 @@ readme = "../../README.md"
 # `LICENSE` and `NOTICE` are copies of the repository root's, kept in this directory
 # rather than reached for upward the way `readme` is: Cargo relocates a `readme` from
 # outside the package but packages nothing else from there, so without the copies an
-# Apache-2.0 crate shipped no licence text and no attribution notice at all - the two
-# things section 4 of that licence requires a redistributor to hand on. Keep them
+# Apache-2.0 crate shipped no license text and no attribution notice at all - the two
+# things section 4 of that license requires a redistributor to hand on. Keep them
 # byte-identical to the root pair.
 version.workspace = true
 edition.workspace = true
