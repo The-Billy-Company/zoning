@@ -9,7 +9,7 @@ import {
 } from "vscode-languageclient/node";
 
 const exec = promisify(execFile);
-const output = vscode.window.createOutputChannel("Zoning");
+const output = vscode.window.createOutputChannel("Zoning", { log: true });
 let client: LanguageClient | undefined;
 
 function executable(): string {

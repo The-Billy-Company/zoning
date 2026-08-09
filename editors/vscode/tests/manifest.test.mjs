@@ -13,7 +13,7 @@ test("manifest registers language, commands, and bundled client", () => {
     manifest.contributes.commands.map(({ command }) => command),
     ["zoning.setup", "zoning.status"],
   );
-  assert.equal(manifest.dependencies["vscode-languageclient"], "^9.0.1");
+  assert.equal(manifest.dependencies["vscode-languageclient"], "^10.1.0");
   assert.equal(manifest.main, "./dist/extension.js");
 });
 
