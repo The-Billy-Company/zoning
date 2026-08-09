@@ -98,14 +98,14 @@
     "package": "npm run clean && npm run test && vsce package --no-dependencies --out ./artifacts/raw.vsix && python3 ./scripts/deterministic.py ./artifacts/raw.vsix ../../crates/zoning/src/setup/payload/zoning.vsix"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.1.2",
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.6.2",
-    "esbuild": "^0.25.0",
-    "typescript": "^5.8.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^7.0.2",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
   }
