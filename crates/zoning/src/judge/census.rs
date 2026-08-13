@@ -6,7 +6,7 @@
 //! bypass count for the rest, ranked so the worst offender is the obvious next move.
 //! None of it can fail a build.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::law::{dir_of, inside};
 use crate::ordinance::Ordinance;
@@ -101,6 +101,19 @@ pub(super) fn take(survey: &Survey, ordinance: &Ordinance) -> Census {
     let mut hops: Vec<(u32, usize)> = hops.into_iter().collect();
     hops.sort_unstable();
 
+    // Tallied in one pass over the files rather than one pass per zone. Asking each
+    // zone how many files it holds reads better, but `zone_of` is itself a walk over
+    // every zone, so that spelling costs zones² × files glob matches — on a drafted
+    // contract, where a zone per directory is the whole point, it is the difference
+    // between a gate that answers and one somebody kills. A file two zones claim
+    // still counts for neither: that is a violation, not a tenancy.
+    let mut held: HashMap<usize, usize> = HashMap::new();
+    for file in &survey.files {
+        if let Some(zone) = ordinance.zone_of(file) {
+            *held.entry(zone.rank).or_default() += 1;
+        }
+    }
+
     Census {
         files: survey.files.len(),
         edges: survey.edges.len(),
@@ -110,14 +123,7 @@ pub(super) fn take(survey: &Survey, ordinance: &Ordinance) -> Census {
         zones: ordinance
             .zones
             .iter()
-            .map(|z| {
-                let held = survey
-                    .files
-                    .iter()
-                    .filter(|f| ordinance.zone_of(f).is_some_and(|found| found.rank == z.rank))
-                    .count();
-                (z.name.clone(), held)
-            })
+            .map(|z| (z.name.clone(), held.get(&z.rank).copied().unwrap_or_default()))
             .collect(),
         sealable,
         seal_debt,
@@ -160,7 +166,9 @@ fn standing(survey: &Survey, ordinance: &Ordinance) -> Vec<(String, Standing)> {
 /// reach for. A directory with neither is not a candidate for a seal.
 fn fronted(survey: &Survey) -> HashMap<&str, &str> {
     let extension = survey.dialect.extensions().first().copied().unwrap_or_default();
-    let have: Vec<&str> = survey.files.iter().map(String::as_str).collect();
+    // Membership, not a scan: every directory asks after two exact names, and a linear
+    // search per question is directories × files on a tree where both are large.
+    let have: HashSet<&str> = survey.files.iter().map(String::as_str).collect();
     let mut directories: Vec<&str> = have.iter().map(|f| dir_of(f)).filter(|d| *d != ".").collect();
     directories.sort_unstable();
     directories.dedup();
@@ -170,7 +178,7 @@ fn fronted(survey: &Survey) -> HashMap<&str, &str> {
         let name = directory.rsplit_once('/').map_or(directory, |(_, n)| n);
         let candidates =
             [format!("{directory}/{name}.{extension}"), format!("{directory}.{extension}")];
-        if let Some(entry) = candidates.iter().find_map(|c| have.iter().find(|f| **f == c)) {
+        if let Some(entry) = candidates.iter().find_map(|c| have.get(c.as_str())) {
             out.insert(directory, *entry);
         }
     }
