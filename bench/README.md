@@ -36,6 +36,19 @@ with the first line the tool actually said, and never quietly folded into a win
 for anybody. `rivals.py` classifies verdicts for exactly this reason instead of
 testing `returncode == 0`.
 
+Reading the output is the last net, not the first, because the likeliest way to
+race a tool that isn't installed is a **launcher standing where it should be** -
+a shim whose complaint looks nothing like a crash and exits the same `1` a real
+violation does. Left alone, one of those agrees with every case that expects a
+violation and posts a time measuring how fast it gave up. So each tool has to say
+its own version, **in the tree it is about to judge**, since a shim resolves per
+directory and the launcher that answered here may be standing in front of nothing
+in a temporary corpus. Whatever will not identify itself is dropped before the
+table is built, or reported `error` if it fails only in one tree. The test is that
+a version has a digit in it and a complaint does not - no launcher is named
+anywhere, because a list of launchers is wrong the day somebody uses one nobody
+here has heard of.
+
 The same care runs the other way. Where a rival cannot express a rule at all it
 is reported `n/a` with a note in its own terms, not as a rival that declined to
 answer. `bench/cases/README.md` has the two cases where that applies and why.

@@ -12,6 +12,15 @@ those is `error`, reported with the first line the tool said, and it is never
 quietly folded into a win for anybody. That distinction is the whole reason this
 file classifies verdicts instead of testing `returncode == 0`.
 
+Reading the output for a failure is the last net rather than the first, because
+the most likely way to race a tool that is not there is a launcher standing in
+its place — a shim whose complaint looks nothing like a crash and exits the same
+`1` a real violation does. So every tool has to say its own version first, and say
+it *in the tree it is about to judge*, since a shim resolves per directory: the
+launcher that answered in this repository may be standing in front of nothing in a
+temporary corpus. A tool that will not identify itself is never raced, and never
+scored.
+
 Rivals are reached the way the rest of this repository reaches a Python tool it
 does not depend on: whatever is already on `PATH`, else `uv run --no-project
 --with`. Versions are floors rather than pins, and whatever actually resolved is
@@ -84,37 +93,80 @@ def zone() -> Launcher | None:
     reading the table could see.
     """
     built = REPO / "target" / "release" / "zoning"
-    if built.exists():
-        return Launcher("zoning", [str(built)], "built", probe([str(built)], "--version"))
+    if built.exists() and (version := speak([str(built)])[0]):
+        return Launcher("zoning", [str(built)], "built", version)
     found = shutil.which("zone") or shutil.which("zoning")
-    if found:
-        return Launcher("zoning", [found], "path", probe([found], "--version"))
+    if found and (version := speak([found])[0]):
+        return Launcher("zoning", [found], "path", version)
     return None
 
 
 def rival(key: str, *, allow_uv: bool = True) -> Launcher | None:
-    """A rival, from `PATH` first so its number carries no wrapper we imposed."""
+    """A rival, from `PATH` first so its number carries no wrapper we imposed.
+
+    A `PATH` hit that will not say its version is not a rival, it is whatever was
+    installed where the rival should have been — so the search continues past it to
+    `uv` rather than racing it. Preferring a working wrapper over a broken direct
+    hit is the only order that cannot silently drop a rival from the table.
+    """
     found = shutil.which(CONSOLE[key])
-    if found:
-        return Launcher(key, [found], "path", probe([found], "--version"))
+    if found and (version := speak([found])[0]):
+        return Launcher(key, [found], "path", version)
     if allow_uv and shutil.which("uv"):
         argv = ["uv", "run", "--no-project", "--with", SPEC[key], CONSOLE[key]]
-        version = probe(argv, "--version")
-        if version != "?":
+        if version := speak(argv)[0]:
             return Launcher(key, argv, "uv", version)
     return None
 
 
-def probe(argv: list[str], flag: str) -> str:
-    """The tool's own version string, reduced to its last token."""
+def speak(argv: list[str], cwd: Path | None = None) -> tuple[str | None, str]:
+    """What the tool calls itself, and the first line it said trying to answer.
+
+    `None` is "it would not identify itself": a non-zero exit, or a last token with
+    no digit in it. Every tool raced here answers `--version` with a version, and a
+    launcher standing in for one that is not installed answers with its own
+    complaint instead. That difference is the only way to tell a tool from a shim
+    without naming a single launcher — and naming them is a list that is wrong the
+    day somebody uses a launcher nobody here has heard of.
+    """
     try:
         done = subprocess.run(  # noqa: S603
-            [*argv, flag], capture_output=True, text=True, timeout=TIMEOUT, check=False
+            [*argv, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT,
+            cwd=cwd,
+            check=False,
         )
-    except (OSError, subprocess.SubprocessError):
-        return "?"
-    text = (done.stdout or done.stderr).strip().splitlines()
-    return text[0].split()[-1] if text and text[0].split() else "?"
+    except (OSError, subprocess.SubprocessError) as broke:
+        return None, str(broke)
+    said = first(f"{done.stdout}\n{done.stderr}")
+    token = said.split()[-1] if said.split() else ""
+    if done.returncode != 0 or not any(ch.isdigit() for ch in token):
+        return None, said
+    return token, said
+
+
+# One answer per tool per tree, since establishing it costs a process and the
+# speed rung asks the same pair over and over.
+_SPOKEN: dict[tuple[str, str], str] = {}
+
+
+def stumbled(tool: Launcher, root: Path) -> str:
+    """Empty if `tool` runs in `root`, else the line it said instead of a version.
+
+    Asked per tree rather than once, because a shim resolves per directory and a
+    tool that cannot start exits the same `1` a real violation does. Without this
+    the whole table inverts quietly: a launcher with nothing behind it agrees with
+    every case that expects a violation, and its time measures the launcher giving
+    up rather than the tool doing the work.
+    """
+    key = (tool.key, str(root))
+    if (seen := _SPOKEN.get(key)) is None:
+        version, said = speak(tool.argv, cwd=root)
+        seen = "" if version else (said or "said nothing when asked its version")
+        _SPOKEN[key] = seen
+    return seen
 
 
 def judge(tool: Launcher, root: Path) -> Run:
@@ -124,7 +176,12 @@ def judge(tool: Launcher, root: Path) -> Run:
     included, because that is the cost a pre-commit hook or a CI job actually
     pays. A comparison that subtracted it would be measuring an algorithm nobody
     can invoke.
+
+    A tool that cannot start *here* is reported as one before anything is timed, so
+    no launcher's complaint is ever priced or scored as an opinion about the tree.
     """
+    if broke := stumbled(tool, root):
+        return Run("error", 0.0, broke)
     argv = argv_for(tool, root)
     env = dict(os.environ)
     # import-linter imports the root package to find it, so the tree it is

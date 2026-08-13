@@ -14,7 +14,13 @@ CI with `--no-uv`, so it is hermetic and downloads nothing.
 Two rules keep the numbers honest. A tool that failed to run is never scored as a tool
 that found a violation, even though both exit non-zero: a moved flag or a config the
 current release parses differently is reported as `error`, quoting what the tool said,
-instead of becoming somebody's win. And where a rival cannot express a rule at all it
+instead of becoming somebody's win. Reading the output for that is the last net rather
+than the first, because the likeliest way to race a tool that is not installed is a
+launcher standing where it should be, whose complaint looks nothing like a crash - so
+every tool says its own version first, in the tree it is about to judge, since a shim
+resolves per directory. A version has a digit in it and a complaint does not, which is
+the whole test; no launcher is named anywhere, because a list of launchers is wrong the
+day somebody uses one nobody here has heard of. And where a rival cannot express a rule at all it
 is reported `n/a` with the reason in its own terms - `import-linter` and `tach` judge
 modules, so a file-granular guest list has no spelling in either config language, and
 calling that a failure to answer would be a lie in our favour.
