@@ -12,7 +12,7 @@ python3 bench/bench.py --json                # one record, for a script
 Three rungs, all quick enough to run while you read the output:
 
 | Rung | Question | Gates? |
-|---|---|---|
+| --- | --- | --- |
 | `correctness` | on cases the language reference decides, who is right? | yes, on us |
 | `speed` | same package, same rule, three tools - how long? | no |
 | `compiler` | Zig has no rival; does `zig` itself say anything? | yes, on us |

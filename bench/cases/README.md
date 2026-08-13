@@ -10,7 +10,7 @@ case captured from our own output could never catch us being wrong, and that is
 the only thing this rung is for.
 
 | Case | Expect | Asked of | Turns on |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `ancestor-init` | violation | zoning | importing a leaf runs its package's `__init__` |
 | `self-import` | clean | zoning | the same rule must not fire on a file's own package |
 | `relative-climb` | violation | all three | `from ..edge.thing import upper` is still an upward edge |
