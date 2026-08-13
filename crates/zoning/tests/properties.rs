@@ -234,6 +234,10 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
     let mut houses: Vec<&str> = grown.files[1..].iter().map(|f| dir_of(f)).collect();
     houses.sort_unstable();
     houses.dedup();
+    // A zone name is one word, and a house may be nested (`kernel/wing`), so the name
+    // and the directory are not the same string. Every zone identity below — the row,
+    // the grant scope, the oracle's own bookkeeping — is the name.
+    let named: Vec<String> = houses.iter().map(|dir| dir.replace('/', "_")).collect();
 
     let mut modules: Vec<&str> = grown.outsiders.iter().map(|(_, m)| *m).collect();
     modules.sort_unstable();
@@ -244,7 +248,7 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
     // covered), or a grant scoped to a random non-empty subset of the houses — chosen
     // without regard to which houses actually import the module, so an empty-coverage
     // scoped grant (a stale one) is just as likely as a useful one.
-    let mut granted: HashMap<&str, Option<Vec<&str>>> = HashMap::new();
+    let mut granted: HashMap<&str, Option<Vec<String>>> = HashMap::new();
     let mut lines = String::new();
     for &module in &modules {
         match rolls.below(3) {
@@ -254,10 +258,10 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
                 let _ = writeln!(lines, "use {module}");
             }
             _ => {
-                let mut scope: Vec<&str> =
-                    houses.iter().copied().filter(|_| rolls.odds(2)).collect();
+                let mut scope: Vec<String> =
+                    named.iter().filter(|_| rolls.odds(2)).cloned().collect();
                 if scope.is_empty() {
-                    scope.push(houses[rolls.below(houses.len())]);
+                    scope.push(named[rolls.below(named.len())].clone());
                 }
                 let _ = writeln!(lines, "use {module} by {}", scope.join(" "));
                 granted.insert(module, Some(scope));
@@ -265,9 +269,12 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
         }
     }
 
+    // One row per directory, claiming that directory's own files and not its children's
+    // — the same non-recursive claim `draft` writes, and for the same reason: a nested
+    // house would otherwise be claimed by two zones at once.
     let mut zones = String::new();
-    for house in &houses {
-        let _ = writeln!(zones, "    {house}  {house}/**");
+    for (house, name) in houses.iter().zip(&named) {
+        let _ = writeln!(zones, "    {name}  {house}/*.zig");
     }
     let text = format!(
         "package grown {{\n\
@@ -300,16 +307,17 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
     let mut want: BTreeSet<String> = BTreeSet::new();
     let mut touched: BTreeSet<&str> = BTreeSet::new();
     for &(from, module) in &grown.outsiders {
-        let zone: Option<&str> = (from != 0).then(|| dir_of(&grown.files[from]));
+        let zone: Option<String> =
+            (from != 0).then(|| dir_of(&grown.files[from]).replace('/', "_"));
         let covered = match granted.get(module) {
             None => false,
             Some(None) => true,
-            Some(Some(scope)) => zone.is_some_and(|z| scope.contains(&z)),
+            Some(Some(scope)) => zone.as_ref().is_some_and(|z| scope.contains(z)),
         };
         if covered {
             touched.insert(module);
         } else {
-            want.insert(format!("{} -> {module}", zone.unwrap_or("facade")));
+            want.insert(format!("{} -> {module}", zone.as_deref().unwrap_or("facade")));
         }
     }
     let stale_want: BTreeSet<&str> =

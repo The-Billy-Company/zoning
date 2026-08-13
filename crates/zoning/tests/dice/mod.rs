@@ -98,6 +98,12 @@ pub(crate) fn grow(d: &mut Dice, at: &Path, tangled: bool) -> Grown {
         for room in &ROOMS[..rooms] {
             files.push(format!("{house}/{room}.zig"));
         }
+        // A wing under a house, sometimes: a directory that holds files *and* has a
+        // child that holds files is the only shape in which two zones can end up
+        // claiming one file, so a flat generator cannot see that class of bug at all.
+        for room in &ROOMS[..d.between(0, 2)] {
+            files.push(format!("{house}/wing/{room}.zig"));
+        }
     }
 
     // The facade reaches one file per directory, so nothing is unreachable and the

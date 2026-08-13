@@ -199,14 +199,22 @@ fn stack(survey: &Survey, package: &str, facade: Option<&str>) -> Vec<(String, V
     names
         .into_iter()
         .zip(groups)
-        .map(|(name, group)| {
-            let globs = group
-                .iter()
-                .map(|dir| if dir == "." { format!("*.{extension}") } else { format!("{dir}/**") })
-                .collect();
-            (name, globs)
-        })
+        .map(|(name, group)| (name, group.iter().map(|dir| claim(dir, extension)).collect()))
         .collect()
+}
+
+/// The glob for one directory's own files — and only its own.
+///
+/// Every directory holding a file is a node in the condensation, so every one of them
+/// lands in exactly one zone and writes its own row. A recursive `dir/**` would then
+/// reach down into a *nested* directory's zone as well, and two zones claiming one file
+/// is a contract that fails its own `verify` — a draft has to be adoptable, and the tool
+/// rejecting its own output is the worst possible first impression. Non-recursive is
+/// also the honest spelling: this row means these files, not this subtree. A person
+/// widening it to `**` afterwards is merging zones on purpose, which is the whole point
+/// of a draft you tighten.
+fn claim(dir: &str, extension: &str) -> String {
+    if dir == "." { format!("*.{extension}") } else { format!("{dir}/*.{extension}") }
 }
 
 /// Does this directory hold any file the contract would have to claim?
