@@ -21,6 +21,11 @@ use crate::judge::{self, dir_of};
 use crate::ordinance::{Law, Ordinance};
 use crate::survey::{Edge, Survey};
 
+/// Where a field's value starts — `"  imports    "`, so a wrap lines up under it.
+const FIELD: usize = 13;
+/// Where a wrapped line breaks. Narrow enough to survive a split editor pane.
+const WIDTH: usize = 78;
+
 /// A rendered answer, and whether the answer was yes.
 ///
 /// The text is for the person and the flag is for the shell, because "may I write this
@@ -55,46 +60,24 @@ pub fn file(rel: &str, ordinance: &Ordinance, survey: &Survey, ink: &Ink) -> Ans
              anything, and every law steps aside for it{reset}"
         );
     }
-    match ordinance.zone_of(rel) {
-        Some(zone) => {
-            let _ = writeln!(
-                out,
-                "  zone       {} {dim}(rank {} of {}, claimed by {}){reset}",
-                zone.name,
-                zone.rank + 1,
-                ordinance.zones.len(),
-                zone.paths
-            );
-            let below: Vec<&str> = ordinance
-                .zones
-                .iter()
-                .filter(|z| z.rank <= zone.rank)
-                .map(|z| z.name.as_str())
-                .collect();
-            let _ = writeln!(
-                out,
-                "  may import {} {dim}(its own zone and everything under it){reset}",
-                below.join(" ")
-            );
-        }
-        None if !ordinance.is_facade(rel) => {
-            let _ = writeln!(
-                out,
-                "  zone       {red}none{reset} {dim}— no zone claims this file, which is \
-                 itself a violation{reset}"
-            );
-        }
-        None => {}
-    }
+    tenancy(&mut out, rel, ordinance, ink);
 
     let granted: Vec<&str> =
         ordinance.uses.iter().filter(|u| u.covers(rel)).map(|u| u.module.as_str()).collect();
-    let _ = writeln!(
-        out,
-        "  may use    {} {dim}(plus {}, ambient in {}){reset}",
-        if granted.is_empty() { "—".to_owned() } else { granted.join(" ") },
-        ordinance.dialect.ambient().join(" "),
-        ordinance.dialect.name()
+    // The ambient set is a property of the language, not of this file — hundreds of
+    // names in Python — and printing it buried every line under it. The count says the
+    // same thing: nothing here is a decision anybody made about this package.
+    field(
+        &mut out,
+        "may use",
+        "",
+        &granted,
+        &format!(
+            "plus the {} modules ambient in {}",
+            ordinance.dialect.ambient().len(),
+            ordinance.dialect.name()
+        ),
+        ink,
     );
 
     for seal in ordinance.seals.iter().filter(|s| rel.starts_with(&format!("{}/", s.path))) {
@@ -112,9 +95,10 @@ pub fn file(rel: &str, ordinance: &Ordinance, survey: &Survey, ink: &Ink) -> Ans
 
     let out_edges: Vec<&Edge> = survey.edges.iter().filter(|e| e.src == rel).collect();
     let in_edges: Vec<&Edge> = survey.edges.iter().filter(|e| e.dst == rel).collect();
-    let _ =
-        writeln!(out, "  imports    {}{}", out_edges.len(), sample(&out_edges, |e| &e.dst, ink));
-    let _ = writeln!(out, "  imported   {}{}", in_edges.len(), sample(&in_edges, |e| &e.src, ink));
+    let outs = out_edges.len().to_string();
+    let ins = in_edges.len().to_string();
+    field(&mut out, "imports", &outs, &ends(&out_edges, |e| &e.dst), "", ink);
+    field(&mut out, "imported", &ins, &ends(&in_edges, |e| &e.src), "", ink);
 
     let verdict = judge::judge(survey, ordinance);
     let here = survey.rel(rel);
@@ -198,7 +182,7 @@ pub fn edge(from: &str, to: &str, ordinance: &Ordinance, survey: &Survey, ink: &
 /// A hypothetical edge still needs a hop count, since the reach ceiling is about how
 /// far a spelling climbs. The shortest spelling is the fairest one to judge: if even
 /// that exceeds the ceiling, no way of writing the import would pass.
-fn spelled(from: &str, to: &str) -> Edge {
+pub(super) fn spelled(from: &str, to: &str) -> Edge {
     let (here, there) = (dir_of(from), dir_of(to));
     let shared = here
         .split('/')
@@ -212,17 +196,102 @@ fn spelled(from: &str, to: &str) -> Edge {
     Edge { src: from.to_owned(), dst: to.to_owned(), line: 0, col: 1, width: 1, hops, spec }
 }
 
-/// Up to three of a list, for a line that has to stay one line.
-fn sample<'a>(edges: &[&'a Edge], pick: impl Fn(&'a Edge) -> &'a String, ink: &Ink) -> String {
-    if edges.is_empty() {
-        return String::new();
+/// Which zone holds this file, on whose authority, and how far that lets it reach.
+fn tenancy(out: &mut String, rel: &str, ordinance: &Ordinance, ink: &Ink) {
+    let Ink { dim, reset, red, .. } = *ink;
+    let Some(zone) = ordinance.zone_of(rel) else {
+        // A facade stands outside the zones on purpose; anything else is unclaimed.
+        if !ordinance.is_facade(rel) {
+            let _ = writeln!(
+                out,
+                "  zone       {red}none{reset} {dim}— no zone claims this file, which is \
+                 itself a violation{reset}"
+            );
+        }
+        return;
+    };
+    let _ = writeln!(
+        out,
+        "  zone       {} {dim}(rank {} of {}){reset}",
+        zone.name,
+        zone.rank + 1,
+        ordinance.zones.len()
+    );
+    // Which line of the contract reached this file, not all of them: a drafted
+    // contract's tangle zone holds hundreds of globs, and printing them buries the
+    // answer under the population it was drawn from.
+    if let Some(glob) = zone.paths.claiming(rel) {
+        let total = zone.paths.raw().len();
+        let of = if total == 1 {
+            "the zone's only path".to_owned()
+        } else {
+            format!("1 of the zone's {total} paths")
+        };
+        let _ = writeln!(out, "  claimed    {glob} {dim}({of}){reset}");
     }
+    let below: Vec<&str> =
+        ordinance.zones.iter().filter(|z| z.rank <= zone.rank).map(|z| z.name.as_str()).collect();
+    field(out, "may import", "", &below, "its own zone and everything under it", ink);
+}
+
+/// Every name on the other end of a set of edges, deduped and in order.
+///
+/// This used to print three and `+6`. Three of nine is not an answer to "who imports
+/// this file" — it is the shape of an answer — and the missing six were exactly the
+/// ones somebody was about to grep for. A file with many callers prints many lines,
+/// which is the honest picture of a file with many callers.
+fn ends<'a>(edges: &[&'a Edge], pick: impl Fn(&'a Edge) -> &'a String) -> Vec<&'a str> {
     let mut names: Vec<&str> = edges.iter().map(|e| pick(e).as_str()).collect();
     names.sort_unstable();
     names.dedup();
-    let shown = names.iter().take(3).copied().collect::<Vec<_>>().join(" · ");
-    let more = if names.len() > 3 { format!(" · +{}", names.len() - 3) } else { String::new() };
-    format!(" {}{shown}{more}{}", ink.dim, ink.reset)
+    names
+}
+
+/// One `name  value (gloss)` row, wrapped under the field when the value overruns.
+///
+/// Every list in this report is unbounded — a zone may claim two hundred globs, a file
+/// may import a hundred others — and a list that runs off the right edge is a list
+/// nobody can read the end of. The gloss trails the value while the row fits and moves
+/// up beside the field name when it doesn't, because a parenthetical stranded after
+/// eleven wrapped rows reads as a note about the last name rather than about the field.
+fn field(out: &mut String, name: &str, lead: &str, names: &[&str], gloss: &str, ink: &Ink) {
+    let Ink { dim, reset, .. } = *ink;
+    let note = if gloss.is_empty() { String::new() } else { format!(" {dim}({gloss}){reset}") };
+    let head = format!("  {name:<10}{}{lead}", if lead.is_empty() { "" } else { " " });
+    let rows = wrapped(names);
+    match rows.as_slice() {
+        // A count already says "none"; a dash beside it would say it twice.
+        [] if !lead.is_empty() => {
+            let _ = writeln!(out, "{head}{note}");
+        }
+        [] => {
+            let _ = writeln!(out, "{head} {dim}—{reset}{note}");
+        }
+        [only] if FIELD + only.chars().count() + gloss.chars().count() + 3 <= WIDTH => {
+            let _ = writeln!(out, "{head} {only}{note}");
+        }
+        rows => {
+            let _ = writeln!(out, "{head}{note}");
+            for row in rows {
+                let _ = writeln!(out, "{}{row}", " ".repeat(FIELD));
+            }
+        }
+    }
+}
+
+/// Names joined into lines narrow enough to sit under a field without wrapping again.
+fn wrapped(names: &[&str]) -> Vec<String> {
+    let mut rows: Vec<String> = Vec::new();
+    for name in names {
+        match rows.last_mut() {
+            Some(row) if FIELD + row.chars().count() + 3 + name.chars().count() <= WIDTH => {
+                row.push_str(" · ");
+                row.push_str(name);
+            }
+            _ => rows.push((*name).to_owned()),
+        }
+    }
+    rows
 }
 
 /// The last two path components — enough to name a contract beside its package name.

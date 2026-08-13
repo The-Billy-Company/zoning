@@ -111,6 +111,16 @@ impl Globs {
         self.0.iter().map(Pattern::as_str)
     }
 
+    /// The first glob claiming `path`, as written.
+    ///
+    /// Which line of the contract reached this file is a different question from
+    /// whether any did, and it is the one a person asking about one file wants: a zone
+    /// may hold two hundred globs, and exactly one of them is the answer.
+    #[must_use]
+    pub fn claiming(&self, path: &str) -> Option<&str> {
+        self.0.iter().find(|p| p.matches(path)).map(Pattern::as_str)
+    }
+
     /// Is the set empty — claiming nothing at all?
     #[must_use]
     pub fn is_empty(&self) -> bool {
