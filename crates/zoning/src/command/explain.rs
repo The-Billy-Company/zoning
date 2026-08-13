@@ -65,9 +65,11 @@ pub(super) fn explain(
         .map(|path| judged(path, &contract, &found, tracked))
         .collect::<Result<_>>()?;
 
-    let answer = match named.as_slice() {
-        [one] => report::file(one, &contract, &found, &options.ink),
-        [from, to] => report::edge(from, to, &contract, &found, &options.ink),
+    let answer = match (named.as_slice(), options.json) {
+        ([one], false) => report::file(one, &contract, &found, &options.ink),
+        ([one], true) => report::machine::node(one, &contract, &found),
+        ([from, to], false) => report::edge(from, to, &contract, &found, &options.ink),
+        ([from, to], true) => report::machine::edge(from, to, &contract, &found),
         _ => return Err("`explain` takes one file, or two".into()),
     };
     spinner.stop();

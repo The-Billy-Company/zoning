@@ -167,7 +167,12 @@ fn judge_all(
         });
 
         if options.verb == Verb::Map {
-            out.push_str(&report::map(&contract, &found, options.ink));
+            if options.json {
+                out.push_str(&report::graph(&contract, &found));
+                out.push('\n');
+            } else {
+                out.push_str(&report::map(&contract, &found, options.ink));
+            }
             continue;
         }
         let verdict = judge::judge(&found, &contract);
@@ -186,9 +191,11 @@ fn judge_all(
     }
     let dormant = roll.dormant();
     failed |= !dormant.is_empty();
-    if options.json {
+    // `map` already answered in full; a findings array after its graph would be a
+    // second document in the same stream, and nothing could parse the pair.
+    if options.json && options.verb != Verb::Map {
         out.push_str(&report::records(&verdicts, &dormant));
-    } else if !options.suggest {
+    } else if !options.suggest && !options.json {
         for shared in &dormant {
             out.push_str(&report::dormant(shared, &tail(&shared.workspace), options.ink));
         }

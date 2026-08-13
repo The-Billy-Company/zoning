@@ -33,7 +33,8 @@ OPTIONS
     --write             draft: create <name>.zone at the package root if none governs it
     --untracked         judge files version control does not know about
     --suggest           print the declarations that would make today's graph legal
-    --json              one record per finding on stdout
+    --json              the machine form: one record per finding from verify/status,
+                        the whole import graph from map, one object from explain
     --no-color          never colour, even on a terminal
     -h, --help          this
     -V, --version       the version
@@ -144,30 +145,52 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
                 return Err(format!("unknown option `{other}` — try `zone --help`").into());
             }
             other if !seen_verb => {
-                options.verb = match other {
-                    "verify" => Verb::Verify,
-                    "status" => Verb::Status,
-                    "list" => Verb::List,
-                    "show" => Verb::Show,
-                    "map" => Verb::Map,
-                    "explain" => Verb::Explain,
-                    "draft" => Verb::Draft,
-                    "lsp" => Verb::Lsp,
-                    "setup" => Verb::Setup,
-                    _ => {
-                        return Err(format!(
-                            "unknown verb `{other}` — try verify, status, list, show, map, \
-                             explain, draft, lsp, or setup"
-                        )
-                        .into());
-                    }
-                };
+                options.verb = verb(other)?;
                 seen_verb = true;
             }
             other => options.args.push(other.to_owned()),
         }
     }
 
+    // A flag that is quietly ignored is worse than one that is refused: a script asking
+    // for JSON and getting prose has no way to tell, so it parses a report as data and
+    // is wrong somewhere else entirely. Only the verbs with a machine form accept it.
+    if options.json
+        && !matches!(options.verb, Verb::Verify | Verb::Status | Verb::Map | Verb::Explain)
+    {
+        return Err("`--json` is the machine form of a verdict, a graph, or an explanation \
+                    — `verify`, `status`, `map`, and `explain` answer in it"
+            .into());
+    }
+
+    arity(&options)?;
+    Ok(Some(options))
+}
+
+/// The verb by name, or the roster it was measured against.
+fn verb(name: &str) -> Result<Verb> {
+    match name {
+        "verify" => Ok(Verb::Verify),
+        "status" => Ok(Verb::Status),
+        "list" => Ok(Verb::List),
+        "show" => Ok(Verb::Show),
+        "map" => Ok(Verb::Map),
+        "explain" => Ok(Verb::Explain),
+        "draft" => Ok(Verb::Draft),
+        "lsp" => Ok(Verb::Lsp),
+        "setup" => Ok(Verb::Setup),
+        _ => Err(format!(
+            "unknown verb `{name}` — try verify, status, list, show, map, explain, draft, \
+             lsp, or setup"
+        )
+        .into()),
+    }
+}
+
+/// Whether this verb was given the operands it takes — refused here rather than
+/// half-run, since a verb that ignores an extra argument silently answers about
+/// something other than what was asked.
+fn arity(options: &Options) -> Result<()> {
     match (options.verb, options.args.len()) {
         (Verb::Explain, 1 | 2) | (Verb::Draft, 0 | 1) | (Verb::Lsp, 0)
             if options.verb != Verb::Lsp || options.stdio => {}
@@ -187,5 +210,5 @@ pub(super) fn parse(argv: impl Iterator<Item = String>) -> Result<Option<Options
             .into());
         }
     }
-    Ok(Some(options))
+    Ok(())
 }

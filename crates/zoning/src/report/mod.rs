@@ -11,10 +11,15 @@ mod human;
 mod json;
 mod map;
 
-pub use explain::{edge, file};
+pub use explain::{Answer, edge, file};
 pub use human::{dormant, show, suggest, verdict};
-pub use json::records;
+pub use json::{graph, records};
 pub use map::map;
+
+/// The machine forms of the two questions `explain` answers.
+pub mod machine {
+    pub use super::json::{edge, node};
+}
 
 /// Terminal colour, or nothing at all when the destination is not a terminal.
 ///
