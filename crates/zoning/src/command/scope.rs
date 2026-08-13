@@ -75,6 +75,20 @@ pub(super) fn declared(dir: &Path, dialect: &'static dyn Dialect) -> Option<Stri
         .filter(|name| !name.is_empty())
 }
 
+/// The language this directory is declared in, according to the manifest sitting in it.
+///
+/// `--language` is documented as the language for packages that *do not name one*, and a
+/// directory holding `pyproject.toml` has named one. Reading it here is what lets `list`
+/// print a command somebody can paste: the row already knows the dialect, and asking the
+/// reader to repeat it back on the next line is a flag that exists only to restate a fact
+/// already on disk.
+pub(super) fn spoken(dir: &Path) -> Option<&'static dyn Dialect> {
+    zoning::survey::dialects()
+        .iter()
+        .copied()
+        .find(|d| d.manifests().iter().any(|m| dir.join(m).exists()))
+}
+
 /// `to`, spelled the way you would have to type it from `from`.
 ///
 /// Only ever one level up here, so this is the difference between a hint you can paste

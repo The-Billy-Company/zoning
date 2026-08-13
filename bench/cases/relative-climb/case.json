@@ -1,0 +1,9 @@
+{
+  "title": "A relative import that climbs out of its layer",
+  "rule": "core sits below edge, so core may not import edge",
+  "expect": "violation",
+  "why": "acme/core/leaf.py writes `from ..edge.thing import upper`, which resolves to acme.edge.thing — the same dependency an absolute spelling would create, and the same one the stack forbids. This is the head-to-head case: all three tools can state the rule, so all three should catch it.",
+  "spec": "https://docs.python.org/3/reference/import.html#package-relative-imports",
+  "tools": ["zoning", "import-linter", "tach"],
+  "gate": true
+}

@@ -1,0 +1,12 @@
+# The same rule the .zone contract states, in import-linter's own idiom.
+[importlinter]
+root_package = acme
+
+[importlinter:contract:layers]
+name = A layer may import downward only
+type = layers
+layers =
+    edge
+    core
+containers =
+    acme

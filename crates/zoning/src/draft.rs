@@ -37,7 +37,7 @@ pub fn contract(survey: &Survey, package: &str, root: &str, nested: &[String]) -
     let zones = stack(survey, package, facade.as_deref());
     let mut out = format!(
         "// {package} — import topology, drafted by `zone draft` from the real\n\
-         // @import graph. Every line below is TRUE of the tree as it stands: this is\n\
+         // import graph. Every line below is TRUE of the tree as it stands: this is\n\
          // a description, not a wish. Read it once, then start tightening it —\n\
          // merging two zones or sealing a directory is where the value is.\n\
          \n\

@@ -1,0 +1,13 @@
+// A two-layer stack: `core` is the floor, `edge` sits above it. Zones are listed
+// low to high, which is the opposite of how both rivals list layers — the
+// reversal is theirs, and each config below says the same thing.
+package acme {
+    root     .
+    language python
+    facade   acme/__init__.py
+}
+
+zones {
+    core acme/core/**
+    edge acme/edge/**
+}

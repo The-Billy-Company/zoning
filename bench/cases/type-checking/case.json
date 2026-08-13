@@ -1,0 +1,9 @@
+{
+  "title": "An upward import hidden under if TYPE_CHECKING",
+  "rule": "core sits below edge, so core may not import edge",
+  "expect": "violation",
+  "why": "The dependency is written down in the source, and a reader following it lands in the layer above. It costs nothing at runtime, which is exactly why it is contested: a tool may reasonably hold that architecture governs coupling rather than execution, or that a type-only edge is free. We record who says what instead of insisting.",
+  "spec": "https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING",
+  "tools": ["zoning", "import-linter", "tach"],
+  "gate": false
+}

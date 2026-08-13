@@ -1,0 +1,15 @@
+// The companion to `ancestor-init`, and the reason that one is hard: the same
+// resolver that must count a parent `__init__.py` as a dependency must also not
+// count the one the importing file is already inside. Both boxes, or neither.
+package acme {
+    root     .
+    language python
+    facade   acme/__init__.py
+}
+
+zones {
+    core acme/core/**
+    edge acme/edge/**
+}
+
+forbid cycles across directories

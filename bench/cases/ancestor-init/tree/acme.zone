@@ -1,0 +1,16 @@
+// The zones are ordered so the import under test is legal by every other law:
+// `outsider` sits above `deep`, so reaching down into it is exactly what the
+// stack permits. The only thing left that can fire is the guest list — which is
+// the point. A case that trips two laws proves neither.
+package acme {
+    root     .
+    language python
+    facade   acme/__init__.py
+}
+
+zones {
+    deep     acme/deep/**
+    outsider acme/outsider/**
+}
+
+keep acme/deep/__init__.py to acme/deep/**

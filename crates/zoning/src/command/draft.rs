@@ -9,7 +9,7 @@ use zoning::spinner::Spinner;
 
 use super::Tracked;
 use super::args::Options;
-use super::scope::{barren, declared, module, pathdiff, probe, tail};
+use super::scope::{barren, declared, module, pathdiff, probe, spoken, tail};
 
 /// A contract describing what a directory's graph already does.
 ///
@@ -24,7 +24,13 @@ pub(super) fn draft(
         std::env::current_dir().map_err(|e| format!("cannot read the current directory: {e}"))?;
     let target = options.args.first().map_or(".", String::as_str);
     let dir = here.join(target).canonicalize().map_err(|e| format!("`{target}`: {e}"))?;
-    let declares = |at: &Path| options.language.manifests().iter().any(|m| at.join(m).exists());
+    // The manifest on disk outranks the default, in that order: a directory that declares
+    // itself has already said what language it is, and `--language` is for the ones that
+    // have not. Without this, `draft` on a Python package under the default dialect finds
+    // no `build.zig`, decides the package is not a package, and refuses the exact command
+    // `list` just printed.
+    let language = spoken(&dir).unwrap_or(options.language);
+    let declares = |at: &Path| language.manifests().iter().any(|m| at.join(m).exists());
     // `draft src` is the natural mistake, because `src` is where the code is. It is also
     // the one mistake that succeeds quietly: a package named after the source directory,
     // its contract filed one level too deep, and every later `--package` invocation
@@ -39,12 +45,18 @@ pub(super) fn draft(
         )
         .into());
     }
-    let name = declared(&dir, options.language)
+    let name = declared(&dir, language)
         .or_else(|| dir.file_name().map(|n| n.to_string_lossy().into_owned()))
         .ok_or_else(|| format!("`{target}` has no directory name to take the package name from"))?;
 
     let (source, nested) = module(&dir);
-    let held = ordinance::parcels(&dir, &[]);
+    // The target itself is a parcel of this sweep whenever it holds a manifest, and it is
+    // not one of the packages it "holds" — naming it would render as an empty path and read
+    // as a message with a word missing.
+    let held: Vec<_> = ordinance::parcels(&dir, &[])
+        .into_iter()
+        .filter(|p| !p.dir.is_empty() && p.dir != ".")
+        .collect();
     if !declares(&dir) && !held.is_empty() {
         let names: Vec<&str> = held.iter().map(|p| p.dir.as_str()).collect();
         return Err(format!(
@@ -55,9 +67,9 @@ pub(super) fn draft(
         )
         .into());
     }
-    let found = probe(&dir, source, options.language, tracked, &nested, &name);
+    let found = probe(&dir, source, language, tracked, &nested, &name);
     if found.files.is_empty() {
-        return Err(barren(&dir, source, options.language, &nested).into());
+        return Err(barren(&dir, source, language, &nested).into());
     }
     let text = zoning::draft::contract(&found, &name, source, &nested);
 

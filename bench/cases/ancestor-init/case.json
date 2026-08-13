@@ -1,0 +1,10 @@
+{
+  "title": "Importing a leaf runs its package's __init__",
+  "rule": "keep acme/deep/__init__.py to acme/deep/**",
+  "expect": "violation",
+  "why": "acme/outsider/use.py imports acme.deep.leaf, and Python initializes every parent package on the way down — so acme/deep/__init__.py runs, and the guest list that names only acme/deep/** was not honoured. The import that broke the rule never mentions the file it broke it on.",
+  "spec": "https://docs.python.org/3/reference/import.html#regular-packages",
+  "tools": ["zoning"],
+  "gate": true,
+  "unexpressible": "import-linter and tach judge modules, not files: to them acme.deep and acme.deep.leaf are one subject, so a guest list that admits the leaf but not the package's own __init__ has no spelling in either config language."
+}

@@ -1,0 +1,14 @@
+// Same two-layer stack as the other head-to-head boxes; only `core/leaf.py`
+// differs, because the spelling of the import is the whole case.
+package acme {
+    root     .
+    language python
+    facade   acme/__init__.py
+}
+
+// `importlib` needs no grant: the standard library is ambient, which is also why
+// nothing here has a grant to remove when this case starts being caught.
+zones {
+    core acme/core/**
+    edge acme/edge/**
+}

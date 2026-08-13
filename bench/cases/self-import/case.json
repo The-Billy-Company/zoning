@@ -1,0 +1,10 @@
+{
+  "title": "A file may import the package it already lives in",
+  "rule": "forbid cycles across directories",
+  "expect": "clean",
+  "why": "acme/core/leaf.py spelling its neighbour absolutely, as acme.core.helper, is the same import as a relative one — and acme/core/__init__.py was already running before leaf.py began. Counting that init as a fresh dependency invents a cycle between a directory and itself, which is the false positive the ancestor rule has to not create.",
+  "spec": "https://docs.python.org/3/reference/import.html#submodules",
+  "tools": ["zoning"],
+  "gate": true,
+  "unexpressible": "neither rival has a file-granular cross-directory cycle law, so there is nothing to ask them: this case exists to pin our own law against over-firing, which is the risk any ancestor-aware resolver takes on."
+}

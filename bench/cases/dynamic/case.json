@@ -1,0 +1,9 @@
+{
+  "title": "The upward import assembled from a string at runtime",
+  "rule": "core sits below edge, so core may not import edge",
+  "expect": "violation",
+  "why": "importlib.import_module(\"acme.edge.thing\") is the dependency, and the layering is broken as thoroughly as by any import statement. No static reader can be expected to catch it in general, so the honest expectation is `violation` and the honest report is that nobody agrees. This case is here to keep that limit written down rather than discovered by whoever trusted the green tick.",
+  "spec": "https://docs.python.org/3/library/importlib.html#importlib.import_module",
+  "tools": ["zoning", "import-linter", "tach"],
+  "gate": false
+}

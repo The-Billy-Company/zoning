@@ -84,6 +84,12 @@ jobs:
             fi
             echo "::endgroup::"
           done
+      # The oracle rung of bench/, which is the half that can fail: cases whose
+      # expected verdict comes from the language reference rather than from this
+      # tool's own output. `--no-uv` keeps it hermetic - no rival is downloaded,
+      # so the rivals report `absent` and only our own answers are judged.
+      - name: the language's answers, not ours
+        run: python3 bench/bench.py --only correctness --no-uv
 
   # A binary people install into their CI must build where their CI runs.
   portability:
@@ -256,8 +262,8 @@ jobs:
         run: uv run --no-project --with editorconfig-checker==3.8.0 ec
       - name: Python lint and format
         run: |
-          uv run --no-project --with ruff==0.16.1 ruff check tools/differential.py editors/vscode/scripts/deterministic.py
-          uv run --no-project --with ruff==0.16.1 ruff format --check tools/differential.py editors/vscode/scripts/deterministic.py
+          uv run --no-project --with ruff==0.16.1 ruff check tools/differential.py editors/vscode/scripts/deterministic.py bench/*.py
+          uv run --no-project --with ruff==0.16.1 ruff format --check tools/differential.py editors/vscode/scripts/deterministic.py bench/*.py
       - name: Shell correctness
         run: git ls-files -z '*.sh' '.githooks/pre-push' | xargs -0 uv run --no-project --with shellcheck-py==0.11.0.1 shellcheck
 

@@ -128,7 +128,6 @@ impl Dialect for Python {
         _source: &str,
         code: &[u8],
     ) -> Vec<Import> {
-        let depth = depth_of(path);
         // Hyphen and underscore are the same package to a human, but only one of
         // them can appear in an identifier — a manifest's `my-package` is always
         // spelled `import my_package` in code, never with the hyphen.
@@ -144,11 +143,11 @@ impl Dialect for Python {
                 continue;
             }
             if from_at == Some(at) {
-                let (found, end) = parse_from(code, roots, &own, depth, at);
+                let (found, end) = parse_from(code, roots, &own, path, at);
                 out.extend(found);
                 i = end;
             } else {
-                let (found, end) = parse_plain(code, roots, &own, depth, at);
+                let (found, end) = parse_plain(code, roots, &own, path, at);
                 out.extend(found);
                 i = end;
             }
@@ -176,7 +175,7 @@ fn parse_from(
     code: &[u8],
     roots: &[&str],
     own: &str,
-    depth: usize,
+    path: &str,
     at: usize,
 ) -> (Vec<Import>, usize) {
     let mut j = at + 4;
@@ -214,13 +213,16 @@ fn parse_from(
             }
         }
     }
-    let climbs = if dots == 0 { depth } else { dots - 1 };
+    let climbs = if dots == 0 { depth_of(path) } else { dots - 1 };
     let prefix = "../".repeat(climbs);
     let dir = if module.is_empty() {
         prefix.trim_end_matches('/').to_owned()
     } else {
         format!("{prefix}{}", module.replace('.', "/"))
     };
+    if dots == 0 {
+        out.extend(ancestors(&prefix, module, path).into_iter().map(|found| spec(at, found)));
+    }
     if !module.is_empty() {
         out.push(spec(at, format!("{dir}.py")));
     }
@@ -241,7 +243,7 @@ fn parse_plain(
     code: &[u8],
     roots: &[&str],
     own: &str,
-    depth: usize,
+    path: &str,
     at: usize,
 ) -> (Vec<Import>, usize) {
     let start = at + 6;
@@ -270,18 +272,58 @@ fn parse_plain(
             }
             dotted
         };
-        let prefix = "../".repeat(depth);
+        let prefix = "../".repeat(depth_of(path));
         let dir = if dotted.is_empty() {
             prefix.trim_end_matches('/').to_owned()
         } else {
             format!("{prefix}{}", dotted.replace('.', "/"))
         };
+        out.extend(ancestors(&prefix, dotted, path).into_iter().map(|found| spec(at, found)));
         if !dotted.is_empty() {
             out.push(spec(at, format!("{dir}.py")));
         }
         out.push(spec(at, format!("{dir}/__init__.py")));
     }
     (out, eol)
+}
+
+/// Every ancestor package a dotted spelling initializes that `path` had not already.
+///
+/// `import a.b.c` binds one name and initializes three packages: the interpreter executes
+/// `a/__init__.py`, then `a/b/__init__.py`, then the leaf, in that order. So a file
+/// reaching for a leaf has genuinely taken on whatever its ancestors import — and where a
+/// contract puts an ancestor's `__init__.py` above the importer, that is an up-import the
+/// leaf's own path cannot show. Reading only the leaf lets a stack no interpreter could
+/// honour pass clean.
+///
+/// Only the ancestors the importer is not *already* inside, which is the same reason a
+/// relative import contributes none at all: reaching `a.b.c` from within `a/` cannot be a
+/// new dependency on `a/__init__.py`, because nothing in `a/` runs until it has. Counting
+/// those would make the ordinary absolute self-import — `from mypkg.sub import x`, written
+/// inside `mypkg`, with any non-empty `__init__.py` — a cycle through the package root in
+/// every Python package alive.
+///
+/// `module` is dotted and absolute; `prefix` is the `../` climb to the module root, so
+/// each name walked is module-root-relative and comparable to `path` directly.
+fn ancestors(prefix: &str, module: &str, path: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut walked = String::new();
+    let mut segments = module.split('.').peekable();
+    // The last segment is the module itself, which the caller emits with both of its
+    // candidate spellings; only the packages above it are this function's business.
+    while let Some(segment) = segments.next() {
+        if segments.peek().is_none() {
+            break;
+        }
+        if !walked.is_empty() {
+            walked.push('/');
+        }
+        walked.push_str(segment);
+        if !path.starts_with(&format!("{walked}/")) {
+            out.push(format!("{prefix}{walked}/__init__.py"));
+        }
+    }
+    out
 }
 
 /// Does `module` (an absolute, dot-free-leading spelling) name this package's own
@@ -552,7 +594,7 @@ mod tests {
         // sibling root package.
         assert_eq!(
             specs("mod.py", &["pkg"], "import os, pkg.a, sys\n"),
-            ["os", "pkg/a.py", "pkg/a/__init__.py", "sys"]
+            ["os", "pkg/__init__.py", "pkg/a.py", "pkg/a/__init__.py", "sys"]
         );
     }
 
@@ -659,6 +701,7 @@ import real\n";
                 "from acme.contracts.types import Event\n"
             ),
             [
+                "../contracts/__init__.py",
                 "../contracts/types.py",
                 "../contracts/types/__init__.py",
                 "../contracts/types/Event.py",
@@ -672,7 +715,7 @@ import real\n";
                 "acme",
                 "import acme.contracts.types\n"
             ),
-            ["../contracts/types.py", "../contracts/types/__init__.py"]
+            ["../contracts/__init__.py", "../contracts/types.py", "../contracts/types/__init__.py"]
         );
     }
 
@@ -717,6 +760,7 @@ import real\n";
         assert_eq!(
             owned_specs("mod.py", &["acme"], "acme", "from acme.contracts import X\n"),
             [
+                "acme/__init__.py",
                 "acme/contracts.py",
                 "acme/contracts/__init__.py",
                 "acme/contracts/X.py",
@@ -766,6 +810,68 @@ import sys; import re
         assert_eq!(
             specs("mod.py", &[], "import_module('x')\nreimport = 1\n"),
             Vec::<String>::new()
+        );
+    }
+
+    // Importing a leaf initializes every package above it, so each ancestor's
+    // `__init__.py` is an edge the importer really has. Reading only the leaf let a
+    // contract place an ancestor's `__init__.py` above the importer and still pass, which
+    // is a stack no interpreter could honour.
+    #[test]
+    fn an_absolute_import_depends_on_every_ancestor_it_initializes() {
+        assert_eq!(
+            specs("low/consumer.py", &["mid"], "import mid.deep.leaf\n"),
+            [
+                "../mid/__init__.py",
+                "../mid/deep/__init__.py",
+                "../mid/deep/leaf.py",
+                "../mid/deep/leaf/__init__.py",
+            ]
+        );
+        assert_eq!(
+            specs("low/consumer.py", &["mid"], "from mid.deep.leaf import LEAF\n"),
+            [
+                "../mid/__init__.py",
+                "../mid/deep/__init__.py",
+                "../mid/deep/leaf.py",
+                "../mid/deep/leaf/__init__.py",
+                "../mid/deep/leaf/LEAF.py",
+                "../mid/deep/leaf/LEAF/__init__.py",
+            ]
+        );
+    }
+
+    // The ordinary absolute self-import, written from inside the package it names. Every
+    // Python package with a non-empty `__init__.py` does this, and it is not a dependency
+    // on the package root: nothing under `principia/` runs until `principia/__init__.py`
+    // already has. Counting it made a real binding (principia's) report a four-directory
+    // cycle through its own root.
+    #[test]
+    fn a_file_owes_nothing_to_the_package_root_it_already_lives_under() {
+        assert_eq!(
+            specs("principia/linalg/ops.py", &["principia"], "from principia._loader import ffi\n"),
+            [
+                "../../principia/_loader.py",
+                "../../principia/_loader/__init__.py",
+                "../../principia/_loader/ffi.py",
+                "../../principia/_loader/ffi/__init__.py",
+            ]
+        );
+    }
+
+    // A relative import climbs the importer's own ancestors, and those ran before this
+    // module's first line did — reaching through them takes on nothing new, so counting
+    // them would invent an edge (and a file's dependency on its own parent package).
+    #[test]
+    fn a_relative_import_owes_nothing_to_the_ancestors_it_climbs_through() {
+        assert_eq!(
+            specs("mid/deep/mod.py", &["mid"], "from ..other.leaf import X\n"),
+            [
+                "../other/leaf.py",
+                "../other/leaf/__init__.py",
+                "../other/leaf/X.py",
+                "../other/leaf/X/__init__.py",
+            ]
         );
     }
 

@@ -1,0 +1,12 @@
+// Same two-layer stack as the other head-to-head boxes; only `core/leaf.py`
+// differs, because the spelling of the import is the whole case.
+package acme {
+    root     .
+    language python
+    facade   acme/__init__.py
+}
+
+zones {
+    core acme/core/**
+    edge acme/edge/**
+}

@@ -28,3 +28,6 @@ mise.local.lock
 # one `git add -A` away from committing a hardcoded home path.
 .local*/
 .DS_Store
+
+# Gist's random index stuff
+.gist/
