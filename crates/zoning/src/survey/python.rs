@@ -24,13 +24,15 @@ pub(super) struct Python;
 
 // TOML and Python happen to agree on prose: `#` to end of line, `"`/`'` single-line
 // literals, `"""`/`'''` literals that may hold a raw newline. One table serves both
-// `.py` source and `pyproject.toml`.
+// `.py` source and `pyproject.toml`. They agree on the join too — TOML spells one only
+// inside a multi-line string, which is blanked whole before a backslash is ever read.
 const PROSE: Prose = Prose {
     line_comment: "#",
     block_comment: None,
     line_string: None,
     quotes: b"\"'",
     triple_quotes: &["\"\"\"", "'''"],
+    line_join: true,
 };
 
 impl Dialect for Python {
@@ -741,6 +743,22 @@ if True:
 import sys; import re
 ";
         assert_eq!(specs("mod.py", &[], src), ["os", "sys", "re"]);
+    }
+
+    #[test]
+    fn a_backslash_continues_a_name_list_onto_the_next_line() {
+        // Both halves of a joined statement are one statement: the names after the
+        // break are imports like any other, and the backslash is never one itself.
+        assert_eq!(specs("mod.py", &[], "import os, \\\n    sys\n"), ["os", "sys"]);
+        assert_eq!(
+            specs("mod.py", &[], "from collections import abc, \\\n    OrderedDict\n"),
+            ["collections"]
+        );
+    }
+
+    #[test]
+    fn a_backslash_continues_a_from_clause_before_its_import() {
+        assert_eq!(specs("mod.py", &[], "from os \\\n    import path\n"), ["os"]);
     }
 
     #[test]

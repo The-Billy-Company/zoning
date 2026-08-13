@@ -29,6 +29,13 @@ pub struct Prose {
     /// these is expected to span lines — so it is blanked to its matching close (or to
     /// the end of the file, unterminated) rather than cut off at the first `\n`.
     pub triple_quotes: &'static [&'static str],
+    /// Whether a backslash at end of line joins it to the next, as Python's does.
+    ///
+    /// A joined line is one statement wearing two rows, so the blanked copy erases the
+    /// backslash *and* its newline to spaces: every scan downstream reads a logical
+    /// line without knowing the rule, and a dialect that stops at `\n` stops in the
+    /// right place. Line numbers are taken from the original text, so nothing moves.
+    pub line_join: bool,
 }
 
 impl Prose {
@@ -55,6 +62,9 @@ impl Prose {
                 i = blank_triple(&mut out, i, delim);
             } else if self.quotes.contains(&out[i]) {
                 i = blank_literal(&mut out, i);
+            } else if let Some(end) = self.join_at(&out, i) {
+                blank(&mut out, i, end);
+                i = end;
             } else {
                 i += 1;
             }
@@ -77,6 +87,20 @@ impl Prose {
 
     fn triple_at(&self, buf: &[u8], i: usize) -> Option<&'static [u8]> {
         self.triple_quotes.iter().map(|d| d.as_bytes()).find(|d| buf[i..].starts_with(d))
+    }
+
+    /// The index just past a line join opening at `i`, if one does.
+    ///
+    /// Only ever consulted from code position — a comment or a literal is consumed
+    /// whole by an earlier branch — so a backslash inside either can never join
+    /// anything, which is what keeps a trailing `\` in a comment from swallowing the
+    /// import on the line below it.
+    fn join_at(&self, buf: &[u8], i: usize) -> Option<usize> {
+        if !self.line_join || buf[i] != b'\\' {
+            return None;
+        }
+        let end = i + 1 + usize::from(buf.get(i + 1) == Some(&b'\r'));
+        (buf.get(end) == Some(&b'\n')).then_some(end + 1)
     }
 }
 
@@ -158,6 +182,7 @@ mod tests {
         line_string: Some("\\\\"),
         quotes: b"\"'",
         triple_quotes: &[],
+        line_join: false,
     };
 
     const TRIPLE: Prose = Prose {
@@ -166,6 +191,7 @@ mod tests {
         line_string: None,
         quotes: b"\"'",
         triple_quotes: &["\"\"\"", "'''"],
+        line_join: true,
     };
 
     fn blanked(text: &str) -> String {
@@ -212,6 +238,46 @@ mod tests {
         let src = "x = '''a \" quote and a ' quote'''\nimport sys\n";
         let out = String::from_utf8(TRIPLE.code_only(src)).expect("blanking yields spaces");
         assert_eq!(out.matches("import").count(), 1);
+    }
+
+    fn joined(text: &str) -> String {
+        String::from_utf8(TRIPLE.code_only(text)).expect("blanking yields spaces, never bytes")
+    }
+
+    #[test]
+    fn a_line_join_erases_its_own_newline() {
+        let src = "import pkg.a, \\\n    pkg.c\n";
+        let out = joined(src);
+        assert_eq!(out.len(), src.len(), "byte offsets must not move");
+        assert!(!out.contains('\\'), "the backslash is not part of any name: {out}");
+        assert_eq!(out.lines().count(), 1, "one statement, one logical line: {out}");
+        assert_eq!(
+            out.split_whitespace().collect::<Vec<_>>(),
+            ["import", "pkg.a,", "pkg.c"],
+            "the two rows read as one statement: {out}"
+        );
+    }
+
+    #[test]
+    fn a_carriage_return_still_joins() {
+        assert_eq!(joined("import a, \\\r\n    b\n").lines().count(), 1);
+    }
+
+    #[test]
+    fn a_backslash_in_a_comment_joins_nothing() {
+        let out = joined("# a windows path C:\\\nimport sys\n");
+        assert!(out.contains("import sys"), "the next line must survive whole: {out}");
+        assert_eq!(out.lines().count(), 2, "a comment ends at its newline: {out}");
+    }
+
+    #[test]
+    fn a_backslash_without_a_newline_is_left_alone() {
+        assert!(joined("x = a \\ b\n").contains('\\'));
+    }
+
+    #[test]
+    fn a_dialect_without_line_joins_keeps_its_newline() {
+        assert_eq!(blanked("const a = 1; \\\nconst b = 2;\n").lines().count(), 2);
     }
 
     #[test]

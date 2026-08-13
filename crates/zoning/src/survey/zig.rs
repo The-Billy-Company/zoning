@@ -23,6 +23,9 @@ const PROSE: Prose = Prose {
     line_string: Some("\\\\"),
     quotes: b"\"'",
     triple_quotes: &[],
+    // Zig has no line continuation: a statement ends at its semicolon, and a backslash
+    // in code position is a syntax error rather than a join.
+    line_join: false,
 };
 
 impl Dialect for Zig {
