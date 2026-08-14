@@ -1,0 +1,23 @@
+# The spelling gate discovers this file on its own. It exists to name the words in
+# this tree that are correct and only look wrong, so a real misspelling still fails
+# the build. Nothing here is a spelling anyone chose badly.
+
+[default.extend-words]
+# British spellings, not errors. The gate defaults to the `en` locale and rewrites
+# them, which is a dialect preference rather than a correction. Naming the three is
+# narrower than switching the tree to `en-gb`, which would invert the problem and
+# start flagging the American spellings the rest of this tree uses.
+favour = "favour"
+honoured = "honoured"
+artefact = "artefact"
+
+# A sentinel string returned by tools/differential.py when a side produced output it
+# could not parse. Same word as the prose spelling above, but the gate matches case
+# by case, so the constant needs naming too.
+UNPARSEABLE = "UNPARSEABLE"
+
+# From the modeline closing editors/vim/doc/zoning.txt:
+#   vim:tw=78:ts=8:noet:ft=help:norl:
+# `noet` is Vim's abbreviation for `noexpandtab`. It is a setting name, and a help
+# file whose modeline is "corrected" stops indenting the way Vim help requires.
+noet = "noet"
