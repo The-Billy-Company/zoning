@@ -6,6 +6,249 @@ workspace's `Cargo.toml`.
 
 <!-- towncrier release notes start -->
 
+## [1.4.0] - 2026-08-17
+
+### Added
+
+- A `note` fragment type, for the paragraph that frames a release rather than an
+  entry in it. Towncrier renders types in declaration order and `note` is
+  declared first, so it lands above `### Added` with no template fork and
+  retires itself on fold like any other fragment.
+- `bench/` races this gate against the tools people already use, and checks that it is
+  right. Three rungs: `correctness` asks every tool the same question on committed cases
+  whose expected verdict comes from the language reference rather than from our own
+  output; `speed` builds one clean layered package, writes the same rule as a `.zone`
+  contract, an `.importlinter` layers contract, and `tach.toml` modules, and times all
+  three; `compiler` asks whether `zig` itself says anything about a real cross-directory
+  cycle, which is the only incumbent Zig has.
+
+  Only a case where *we* miss something the language says we should catch can fail the
+  run. A rival disagreeing is reported and never fatal - a benchmark that breaks when
+  somebody else ships a release is a benchmark that gets deleted. The oracle rung runs in
+  CI with `--no-uv`, so it is hermetic and downloads nothing.
+
+  Two rules keep the numbers honest. A tool that failed to run is never scored as a tool
+  that found a violation, even though both exit non-zero: a moved flag or a config the
+  current release parses differently is reported as `error`, quoting what the tool said,
+  instead of becoming somebody's win. Reading the output for that is the last net rather
+  than the first, because the likeliest way to race a tool that is not installed is a
+  launcher standing where it should be, whose complaint looks nothing like a crash - so
+  every tool says its own version first, in the tree it is about to judge, since a shim
+  resolves per directory. A version has a digit in it and a complaint does not, which is
+  the whole test; no launcher is named anywhere, because a list of launchers is wrong the
+  day somebody uses one nobody here has heard of. And where a rival cannot express a rule at all it
+  is reported `n/a` with the reason in its own terms - `import-linter` and `tach` judge
+  modules, so a file-granular guest list has no spelling in either config language, and
+  calling that a failure to answer would be a lie in our favour.
+
+  The corpus is deliberately clean, because a dirty one measures how fast a tool can give
+  up. A clean graph has no early exit in it: every tool has to read every file to say
+  yes, which is the honest worst case and also what CI pays on every green run.
+- `zone map --json` emits the whole import graph, and `zone explain --json` answers both
+  of its questions in the machine form: one file's standing, or whether one import is
+  allowed. Previously only `verify` and `status` had a machine form, and `explain
+  --json` accepted the flag and printed prose anyway - which is worse than refusing it,
+  since a script asking for JSON and getting a report has no way to tell.
+
+  Every edge and every departure in the graph carries the zone each end sits in,
+  resolved during the pass that already did the glob matching, so a consumer never
+  re-derives where a file lives. A verb with no machine form now refuses `--json` and
+  says which verbs have one.
+
+### Changed
+
+- `zone explain FILE` used to print three importers and `+6`. Three of nine is the shape
+  of an answer, not an answer, and the missing six were the ones you were about to go
+  looking for. It prints all of them now, wrapped under the field so a long list stays
+  readable instead of running off the edge.
+
+  Two other lines were the same defect from the other direction. The zone line dumped
+  every glob the zone claims - hundreds, on a drafted contract - where the fact you
+  asked for is which one reached *this* file; that is now its own `claimed` line naming
+  the single clause. And `may use` listed the language's entire ambient set, which is a
+  property of Python rather than a decision anybody made about the package, so it now
+  reports the count and lists only the grants the contract actually wrote.
+
+### Fixed
+
+- A Python import broken across lines with a backslash was read as two things, neither
+  of them right: the names after the break went missing from the graph, and the
+  backslash itself was reported as a module named `\`. So a file could import whatever
+  it liked as long as it wrapped the line, and the one law that catches an undeclared
+  dependency never fired.
+
+  Continuations are now joined where every other lexical question is answered - the
+  blanked copy of the source that already knows a comment from a string erases the
+  backslash and its newline to spaces, so a logical line reaches the dialect as one
+  line without the dialect knowing the rule exists. Line and column numbers still come
+  from the original text, so nothing a diagnostic points at moves.
+- A version bump moved `Cargo.toml` and left the lockfile behind, and `--locked`
+  is the flag whose whole job is to refuse to fix that. A lockfile records the
+  version of every package it locks, including the one it sits next to, so the
+  release bumping the manifest through its `x-release-please-version` annotation
+  put the two a version apart. `cargo publish --locked` then stopped with "cannot
+  update the lock file because --locked was passed", which is correct behaviour and
+  a wedge: nothing about it improves on a retry, so the crate never reaches the
+  registry no matter how many times the release runs.
+
+  `gist` hit it on v1.2.0 with the wheel and the Go module already published, so
+  the tag existed and the crate did not. The committed lock was stale in the tree
+  too, which means `cargo build --locked` in `bindings/rust` was already failing
+  for anyone who tried it.
+
+  The publish now re-pins the lock's own version from the manifest beside it
+  first, hermetically - a `version = "..."` rewrite and nothing else, so no
+  third-party pin can move and the graph being published is still the one that was
+  tested, which is the reason `--locked` is there at all. `cargo update
+  --workspace` was the first attempt and the wrong one: it resolves the whole
+  graph, so it wants a sibling `irregex` checkout for the `irgx` path dependency
+  that this job has no reason to make, and relate's v1.1.0 failed exactly there
+  while `cargo publish --locked` had never needed it.
+- CI cancelled its own evidence on `main`. The concurrency group keyed on the ref
+  and cancelled unconditionally, which is right on a branch whose runs are drafts -
+  a force-push should kill the run it obsoleted rather than race it - and wrong on
+  `main`, where every commit is a candidate to be released and the run is the only
+  record of whether it may be.
+
+  `release.yml` will not publish a tag unless `release-ready` concluded success on
+  that exact commit, which is the check that makes a green release meaningful. But
+  `release-ready` gathers its dependencies under `if: always()`, so it reports on
+  jobs that never finished as readily as on jobs that failed. So the next push to
+  main revoked the previous commit's verdict: a still-running job ended
+  `cancelled`, `release-ready` read that as a failure, and preflight declined a
+  release with nothing wrong with it. On a tree several people push to, that is
+  not a rare race; it is most releases, and it looks exactly like a real test
+  failure until you notice the conclusion is `cancelled` rather than `failure`.
+
+  Caught it on `gist`, whose v1.2.0 tag was green on the pull request and then lost
+  the release commit's `python (3.14)` job to three docs commits landing behind the
+  merge. Every repository in the family had the same line, so every one has the
+  same fix: pushes to main no longer cancel each other and each commit keeps its
+  own answer, while pull request branches still supersede as before.
+- Every release here so far was tagged, released, and relabelled by a person,
+  because `release-please-config.json` named the package and that one line kept the
+  bot from ever cutting one.
+
+  With `include-component-in-tag` off, release-please writes a standalone release
+  PR's body with no component in it, and names the branch
+  `release-please--branches--main` with no component either. Then, on merge, before
+  it will tag anything, it compares that empty component against
+  `component || package-name` - so a `package-name` here makes the two halves of
+  its own bookkeeping disagree permanently. Every merge logged `PR component:
+  undefined does not match configured component: zoning` and returned without
+  creating the tag or the release. That is worse than a missed release, because it
+  wedges: an untagged merged release PR makes the *next* run abort before it opens
+  anything, so the queue stops until someone relabels the old PR by hand - which is
+  where 1.3.1 has been sitting since August, tagged but never released.
+
+  The three maintenance steps on the release PR - the changelog fold, the VS Code
+  payload refresh, and the `Cargo.lock` re-pin - only ran on the push where
+  release-please rewrote the PR. The action sets its `pr` output only when it wrote
+  something, so a `ci`/`docs` commit carrying a new fragment, which changes no
+  version and therefore no note, left that output empty and skipped all three with
+  nothing saying so. A PR could sit open with fragments unfolded, a stale VSIX, and
+  a lock a version behind, and the first complaint would come from preflight
+  refusing to publish it. The branch is now resolved from the
+  `autorelease: pending` label instead, which is release-please's own marker for
+  the PR it is holding open rather than a name guessed from a convention.
+
+  With `always-update` on, the branch is rebuilt on every push while the PR is
+  open, so the fold recomputes from main rather than appending to whatever the
+  branch already carries - towncrier treats a second write of the same version as a
+  hard error, not a no-op.
+- The GitHub Release page now carries the changelog section it names. Two
+  changelogs were produced per release and only one of them was towncrier's:
+  `skip-changelog` hands `CHANGELOG.md` to the fragments, but that key governs
+  the *file*, and composing the release **body** is a separate path inside
+  release-please that kept running off conventional-commit subjects. So the page
+  people land on was assembled from commit subjects while the notes someone
+  wrote sat in the changelog - irregex v2.1.1 published two lines against a
+  folded section of a hundred and ten, because eleven of its thirteen commits
+  were `ci:` or `docs:` and both are hidden. A `notes` job now posts the folded
+  `## [X.Y.Z]` section over that body on tag, waiting for the release to exist
+  rather than assuming it already does, and truncating at a whole bullet under
+  GitHub's 125,000-character body ceiling rather than failing on a tag that is
+  already immutable.
+- The `discipline` job pins ruff and then runs it with no config, so the repo's Python was
+  being judged by ruff's defaults - and it had never actually passed under them. Twelve
+  findings, none of them in the Rust the tool is made of, so scheduled CI on `main` was red
+  for a reason nobody was going to go looking for.
+
+  Two things were wrong. Seven `# noqa` directives named rules the default set doesn't
+  enable, so they suppressed nothing and ruff flagged each one as dead; the `E402` four were
+  dead twice over, since ruff already exempts imports that follow a `sys.path` preamble. And
+  all five `bench/*.py` carried a shebang while none of them was executable. Only `bench.py`
+  has an entry block, so it is executable now and the other four - which are imported, never
+  run - lost a shebang that was decorative.
+
+  `ruff format` had never run at all: the check step aborts on the line above it. Two files
+  are reformatted to the 88 columns the rest of the tree already used.
+- The census asked each zone how many files it held, and answering that question is
+  itself a walk over every zone - so the tally cost zones squared times files in glob
+  matches. On a drafted contract, where a zone per directory is the entire point, a
+  1400-zone package spent 22 seconds counting before it judged anything.
+
+  It now tallies in one pass over the files: 22s to under a second on the same package,
+  with the same numbers. A file two zones claim still counts for neither, because that
+  is a violation rather than a tenancy.
+- The published crate declared Apache-2.0 and carried none of it. `readme` reaches up
+  to the repository's own `README.md` and Cargo relocates that one file into the
+  tarball, which made the omission easy to miss: nothing else above `crates/zoning/`
+  travels, so the license text and the NOTICE did not. Section 4 of that license asks
+  a redistributor for exactly those two files.
+
+  Both are now committed in `crates/zoning/`, byte-identical to the root pair, and the
+  tarball carries them.
+- `dice::scratch` named a directory after what was being tested, not after who asked, so
+  every test in a binary that asked for the same fixture got the same tree - and started by
+  emptying it. Cargo runs a binary's tests on parallel threads, so the four tests in
+  `report.rs` each deleted a tree another was walking. The survey then came back a file
+  short and the report dropped one of forty callers, which is the assertion that failed.
+
+  It read like a wrapping bug in the report, which is the wrong place to look: the emitter
+  is deterministic and the missing name was a different one each time - `_00` on Linux,
+  `_39` on Windows - and never missing at all on macOS, which is what losing a race looks
+  like from the outside. Scheduled CI had been red on this since the tests landed.
+
+  A scratch directory is now private per call rather than per name, so no two tests can
+  ever name the same tree. Nothing about the fixtures or the assertions moved.
+- `import a.mid.deep.leaf` binds one name and initializes three packages: Python runs
+  `a/mid/__init__.py`, then `a/mid/deep/__init__.py`, then the leaf. The Python dialect
+  read only the leaf, so every one of those ancestors was a dependency the importer
+  genuinely had and the contract could not see - and because zones are globs over paths
+  rather than module names, a contract could put `mid/__init__.py` in a zone above the
+  importer and pass clean. A stack no interpreter could honour, judged green.
+
+  An absolute import now also names each ancestor package it wakes. Only the ones the
+  importer does not already live under, which is the same reason a relative import
+  contributes none: nothing inside `mid/` runs until `mid/__init__.py` already has, so
+  reaching `mid.deep.leaf` from within `mid/` cannot be a new dependency on the root.
+  Counting those would have made the ordinary absolute self-import - `from mypkg.sub
+  import x`, written inside `mypkg`, with any non-empty `__init__.py` - a cycle through
+  the package root in every Python package alive.
+- `list` prints the exact `draft` invocation for each ungoverned package so the middle
+  line of adoption is a paste rather than a guess. For a Python package it printed a
+  command that then failed: `list` knew the dialect from the manifest it had just read,
+  `draft` did not read one at all, and under the default dialect it found no `build.zig`,
+  concluded the directory was not a package, and refused - naming the package it was
+  refusing as an empty path, so the message read with a word missing.
+
+  `draft` now takes the language from the manifest sitting in the directory it was
+  pointed at, which is what `--language` always meant: the language for packages that do
+  not name one. Nothing needs the flag to draft a package that declares itself. The
+  drafted header also no longer tells a Python package it was read from an `@import`
+  graph.
+- `zone draft` gave every zone a recursive `dir/**`, so a directory that both holds
+  files and has children handed the same file to two zones. On a flat tree nobody
+  noticed; on a real one the first `zone verify` after a draft opened with thousands of
+  `claimed by 2 zones` findings, which is the worst possible first impression for a
+  contract whose whole promise is that it is true of the tree it came from.
+
+  A drafted zone now claims the files in its own directory and nothing underneath
+  (`dir/*.py`), so the zones partition the tree the way the draft says they do. The
+  generator behind the property tests grows nested directories now too - the shape this
+  bug needed to appear in was the one shape it could not produce.
+
 ## [1.3.1] - 2026-08-08
 
 ### Added
