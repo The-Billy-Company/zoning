@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """One synthetic package, described three times in three config languages.
 
 The corpus is a layered Python package: `zones` stacked subpackages, `modules`
@@ -40,7 +39,9 @@ def build(dest: Path, *, zones: int, modules: int) -> int:
         (here / "__init__.py").write_text("", encoding="utf-8")
         written += 1
         for n in range(modules):
-            (here / f"m{n:02d}.py").write_text(body(names, depth, n, modules), encoding="utf-8")
+            (here / f"m{n:02d}.py").write_text(
+                body(names, depth, n, modules), encoding="utf-8"
+            )
             written += 1
 
     (dest / f"{PACKAGE}.zone").write_text(contract(names), encoding="utf-8")

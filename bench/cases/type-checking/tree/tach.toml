@@ -1,14 +1,14 @@
 # The same rule again, as tach modules with explicit dependencies.
-source_roots = ["."]
+source_roots = [ "." ]
 
 [[modules]]
 path = "acme"
-depends_on = []
+depends_on = [  ]
 
 [[modules]]
 path = "acme.core"
-depends_on = []
+depends_on = [  ]
 
 [[modules]]
 path = "acme.edge"
-depends_on = ["acme.core"]
+depends_on = [ "acme.core" ]

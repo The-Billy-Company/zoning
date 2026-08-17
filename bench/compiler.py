@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """The Zig rung, where the incumbent is the compiler and it has no opinion.
 
 Zig has no import-topology tool to race, so the useful comparison is against the
@@ -61,7 +60,7 @@ def compile_it() -> dict[str, object]:
         argv = [zig, "build-obj", "root.zig", f"-femit-bin={Path(tmp) / 'knot.o'}"]
         start = time.perf_counter()
         try:
-            done = subprocess.run(  # noqa: S603
+            done = subprocess.run(
                 argv,
                 cwd=KNOT / "src",
                 capture_output=True,

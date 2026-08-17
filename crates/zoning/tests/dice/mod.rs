@@ -13,6 +13,7 @@
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// `splitmix64` — deterministic, four lines, and good enough to find parser bugs.
 pub(crate) struct Dice {
@@ -200,8 +201,16 @@ pub(crate) fn file(root: &Path, package: &str, text: &str) -> PathBuf {
 }
 
 /// A private scratch directory, emptied first so a rerun cannot read a stale tree.
+///
+/// Private per *call*, not per name. Cargo runs a binary's tests on parallel threads, so
+/// four tests that build the same fixture used to share one tree: whichever reached the
+/// `remove_dir_all` last deleted the tree another was already walking, and the survey came
+/// back a file short. It surfaced as a report dropping one of forty callers on Linux and
+/// never on macOS, which is what losing a race looks like from the outside.
 pub(crate) fn scratch(what: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("zoning-{what}"));
+    static SEAT: AtomicU64 = AtomicU64::new(0);
+    let seat = SEAT.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("zoning-{what}-{}-{seat}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("scratch dir");
     dir

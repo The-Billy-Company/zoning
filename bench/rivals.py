@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """The tools this benchmark races, and how each one is asked the same question.
 
 Every gate here answers one thing — *does this package's import graph obey its
@@ -130,7 +129,7 @@ def speak(argv: list[str], cwd: Path | None = None) -> tuple[str | None, str]:
     day somebody uses a launcher nobody here has heard of.
     """
     try:
-        done = subprocess.run(  # noqa: S603
+        done = subprocess.run(
             [*argv, "--version"],
             capture_output=True,
             text=True,
@@ -190,7 +189,7 @@ def judge(tool: Launcher, root: Path) -> Run:
     env.pop("PYTHONDONTWRITEBYTECODE", None)
     start = time.perf_counter()
     try:
-        done = subprocess.run(  # noqa: S603
+        done = subprocess.run(
             argv,
             cwd=root,
             capture_output=True,
