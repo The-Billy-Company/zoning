@@ -138,7 +138,7 @@ impl Dialect for Python {
             let from_at = find_word(code, b"from", i);
             let import_at = find_word(code, b"import", i);
             let Some(at) = min_of(from_at, import_at) else { break };
-            if !at_statement_start(code, at) {
+            if !at_import_start(code, at) {
                 i = at + 1;
                 continue;
             }
@@ -363,11 +363,17 @@ fn min_of(a: Option<usize>, b: Option<usize>) -> Option<usize> {
     }
 }
 
-/// Is the byte at `i`, after only horizontal whitespace, the start of a statement?
-fn at_statement_start(code: &[u8], i: usize) -> bool {
+/// Is the import at `i` a statement, optionally prefixed by PEP 810's `lazy`?
+fn at_import_start(code: &[u8], i: usize) -> bool {
     let mut j = i;
     while j > 0 && matches!(code[j - 1], b' ' | b'\t') {
         j -= 1;
+    }
+    if j < i && code[..j].ends_with(b"lazy") {
+        j -= 4;
+        while j > 0 && matches!(code[j - 1], b' ' | b'\t') {
+            j -= 1;
+        }
     }
     j == 0 || matches!(code[j - 1], b'\n' | b';' | b':')
 }
@@ -586,6 +592,64 @@ mod tests {
     #[test]
     fn plain_import_of_an_external_dependency() {
         assert_eq!(specs("pkg/mod.py", &["pkg"], "import numpy as np\n"), ["numpy"]);
+    }
+
+    #[test]
+    fn explicit_lazy_imports_keep_absolute_and_relative_dependencies() {
+        assert_eq!(
+            specs(
+                "pkg/mod.py",
+                &["pkg"],
+                "lazy import os as system, pkg.util\nlazy from ..util import helper as alias\n"
+            ),
+            [
+                "os",
+                "../pkg/util.py",
+                "../pkg/util/__init__.py",
+                "../util.py",
+                "../util/__init__.py",
+                "../util/helper.py",
+                "../util/helper/__init__.py",
+            ]
+        );
+    }
+
+    #[test]
+    fn explicit_lazy_imports_keep_multiline_and_conditional_shapes() {
+        assert_eq!(
+            specs(
+                "mod.py",
+                &["pkg"],
+                "lazy \\\nfrom pkg import (\n    a,\n    b as c,\n)\nif enabled: lazy\timport os; lazy import sys\n"
+            ),
+            [
+                "pkg.py",
+                "pkg/__init__.py",
+                "pkg/a.py",
+                "pkg/a/__init__.py",
+                "pkg/b.py",
+                "pkg/b/__init__.py",
+                "os",
+                "sys",
+            ]
+        );
+    }
+
+    #[test]
+    fn lazy_is_a_soft_keyword_and_prose_is_not_an_import() {
+        assert_eq!(
+            specs(
+                "mod.py",
+                &[],
+                "lazy = 1\nfrom lazy import helper\nimport lazy\n\
+                 # lazy import fake\ntext = 'lazy from fake import helper'\n"
+            ),
+            ["lazy", "lazy"]
+        );
+        assert_eq!(
+            specs("mod.py", &[], "notlazy import fake\nobj.lazy import fake\n"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

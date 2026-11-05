@@ -121,6 +121,33 @@ fn a_second_dialect_is_read_and_judged_through_the_same_pipeline() {
 }
 
 #[test]
+fn lazy_imports_retain_local_edges_and_need_external_grants() {
+    let box_dir = cloned("pass", "snake");
+    std::fs::write(
+        box_dir.join("gate.py"),
+        "lazy import vendorlib\nlazy from core import core\nlazy import ungranted\n",
+    )
+    .expect("write lazy imports");
+    let contract = zoning::ordinance::governing(&box_dir).expect("copied contract");
+    let ordinance = Ordinance::read(&contract, zig()).expect("Python contract");
+    let survey = Survey::of(&Ask {
+        repo_root: &box_dir,
+        module_root: &ordinance.module_root,
+        exclude: &ordinance.exclude,
+        dialect: ordinance.dialect,
+        package: &ordinance.package,
+        tracked: None,
+    });
+    let found = judge::judge(&survey, &ordinance);
+    let _ = std::fs::remove_dir_all(&box_dir);
+
+    assert!(survey.edges.iter().any(|edge| edge.src == "gate.py" && edge.dst == "core/core.py"));
+    assert_eq!(laws(&found), vec![Law::Use]);
+    assert_eq!(found.findings.len(), 1, "only the ungranted dependency is refused");
+    assert!(found.stale.is_empty(), "the lazy vendorlib import exercises its grant");
+}
+
+#[test]
 fn each_law_fires_on_the_fixture_built_to_break_it() {
     for (fixture, expected) in [
         ("uphill", Law::Zone),
