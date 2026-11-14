@@ -6,6 +6,12 @@ workspace's `Cargo.toml`.
 
 <!-- towncrier release notes start -->
 
+## [1.4.1] - 2026-11-14
+
+### Fixed
+
+- We now trace Python 3.15's explicit lazy imports through the same dependency graph as eager imports. Deferring a module no longer hides its import boundaries, dependency grants or cycles from verification.
+
 ## [1.4.0] - 2026-08-17
 
 ### Added
