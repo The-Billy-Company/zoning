@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Idempotent editor integration setup owned by the `zoning` executable.
 
 use std::env;

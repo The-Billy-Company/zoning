@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 " `.zone` is shared with BIND, so the extension cannot decide the filetype on
 " its own. A contract leads with `package` or `workspace` — the same first
 " declaration the tool itself identifies one by — and anything else is left

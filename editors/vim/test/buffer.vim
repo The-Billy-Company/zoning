@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 " What editing a claimed buffer feels like: the options, the indent, and the folds.
 "
 " The indent and fold expressions are checked twice over - once by calling them, which says

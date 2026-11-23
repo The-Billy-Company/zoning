@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Telling code from prose.
 //!
 //! Any textual judgment about source is only as trustworthy as its ability to tell

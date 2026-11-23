@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! One error type for the whole crate.
 //!
 //! A `.zone` file being malformed is a different kind of failure from a directory

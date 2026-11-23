@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! What must hold over graphs nobody wrote by hand.
 //!
 //! The fixtures next door prove each law fires where it should, one hand-built tree per

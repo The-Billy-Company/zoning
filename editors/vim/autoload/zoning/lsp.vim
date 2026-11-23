@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 function! zoning#lsp#command(...) abort
   return [get(g:, 'zoning_executable', 'zoning'), 'lsp', '--stdio']
 endfunction

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Turning a verdict into bytes somebody reads.
 //!
 //! Three audiences, three renderings, one model behind them. The human report leads

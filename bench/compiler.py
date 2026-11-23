@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """The Zig rung, where the incumbent is the compiler and it has no opinion.
 
 Zig has no import-topology tool to race, so the useful comparison is against the

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 const _0 = @import("floor.zig");
 const _1 = @import("engine/engine.zig");
 const _2 = @import("engine/parts.zig");

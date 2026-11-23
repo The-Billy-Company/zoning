@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Each law fires on the fixture built to break it, and on nothing else.
 //!
 //! A gate that fails for the wrong reason will pass for the wrong reason too, so

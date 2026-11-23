@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The ordinance: a package's declared import topology, as the laws will read it.
 //!
 //! Text goes in, a validated model comes out, and everything the grammar cannot

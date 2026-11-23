@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 // Run the shipped TextMate grammar the way VS Code runs it.
 //
 // The grammar is a pile of Oniguruma patterns whose behavior is the *interaction* between

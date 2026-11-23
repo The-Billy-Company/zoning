@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 " What every piece of a contract is painted as.
 "
 " Asked of Vim's own syntax engine rather than of the syntax file: `synID()` at a position

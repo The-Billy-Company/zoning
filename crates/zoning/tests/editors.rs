@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The three adapters, held to the one server.
 //!
 //! `lsp.rs` proves the server answers. This file proves the editors ask — that each adapter

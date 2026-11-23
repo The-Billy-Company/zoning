@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! A terminal progress indicator for work with no useful percentage.
 //!
 //! Every call in this binary that can genuinely take a moment — installing an

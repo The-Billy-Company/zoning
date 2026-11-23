@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The report a person reads.
 //!
 //! Verdict first, then every violation as a `file:line:col:` line an editor can

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Arbitrary bytes, in both places bytes arrive from outside.
 //!
 //! A gate has two mouths: the contract somebody wrote by hand, and the source tree it

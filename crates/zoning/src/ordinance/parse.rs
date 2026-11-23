@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Tokens → parse tree. Recursive descent, one declaration per call.
 //!
 //! The grammar, in full:

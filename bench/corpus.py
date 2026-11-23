@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """One synthetic package, described three times in three config languages.
 
 The corpus is a layered Python package: `zones` stacked subpackages, `modules`

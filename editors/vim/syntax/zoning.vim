@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 if exists('b:current_syntax')
   finish
 endif

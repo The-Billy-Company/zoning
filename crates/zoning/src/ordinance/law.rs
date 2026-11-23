@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The six laws, named once.
 //!
 //! Each exists because a compiler structurally cannot enforce it. They are a

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 

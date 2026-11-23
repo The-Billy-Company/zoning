@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The bench: six laws, judged against a resolved survey.
 //!
 //! Each law catches something a compiler structurally cannot:

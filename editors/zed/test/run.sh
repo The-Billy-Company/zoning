@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 The Billy Company
 # Everything checkable about the Zed extension without running Zed.
 #
 # Three things can be wrong with a Zed language: the grammar can parse the wrong tree, a

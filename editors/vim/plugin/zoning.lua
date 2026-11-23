@@ -1,3 +1,4 @@
+-- Copyright (c) 2026 The Billy Company
 -- `.zone` is shared with BIND, so claim only the files that lead with the
 -- declaration a contract leads with. Returning nil hands the rest back to
 -- Neovim's own detection instead of guessing at them; see ftdetect/zoning.vim,

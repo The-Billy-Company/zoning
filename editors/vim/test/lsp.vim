@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 " Whether each language-client ecosystem is actually told about the server.
 "
 " There are five clients and none of them can be installed on a CI runner, so each one is

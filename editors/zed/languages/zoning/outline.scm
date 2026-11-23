@@ -1,3 +1,4 @@
+; Copyright (c) 2026 The Billy Company
 (package_declaration
   name: (word) @name) @item
 

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """Reaching down into `core`, which the stack allows — and which drags
 `acme/core/__init__.py` in with it, from outside. That edge is real."""
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Zig — the language that needs this tool most, and the first dialect.
 //!
 //! Zig has no module system *inside* a package. Every intra-package import is a

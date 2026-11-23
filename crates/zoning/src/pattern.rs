@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Path globs, with the semantics every other language's linter already agreed on.
 //!
 //! One primitive, no dependency: `*` stops at a separator, `?` is one non-separator

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 use std::fmt::Write as _;
 use std::io::Write as _;
 use std::path::Path;

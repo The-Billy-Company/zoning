@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 if exists('g:loaded_zoning')
   finish
 endif

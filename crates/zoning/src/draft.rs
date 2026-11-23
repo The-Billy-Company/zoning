@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The inverse of judging: read a graph, write the contract it already obeys.
 //!
 //! Adoption is the hard part of any boundary tool. A package with nine hundred files

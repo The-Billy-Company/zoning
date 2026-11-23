@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The machine forms: a verdict, a graph, an explanation.
 //!
 //! Hand-written rather than borrowed: the shapes are strings, integers, and flat

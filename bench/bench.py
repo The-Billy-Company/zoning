@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 The Billy Company
 """Race this gate against the ones people already use, and check it is right.
 
 Two rungs, both quick enough to run while you read the output:

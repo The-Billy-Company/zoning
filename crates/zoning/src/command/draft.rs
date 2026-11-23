@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 use std::io::Write as _;
 use std::path::Path;
 use std::process::ExitCode;

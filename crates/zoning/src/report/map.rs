@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The contract as a picture.
 //!
 //! A zone stack is a tall, ordered thing, and a list of globs does not read like

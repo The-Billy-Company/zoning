@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The greater document: one file a package's contract may hang off.
 //!
 //! Ten packages in one tree are ten copies of the same four lines — the language they

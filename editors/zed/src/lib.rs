@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 use zed_extension_api::{self as zed, LanguageServerId, Result};
 
 struct Zoning;

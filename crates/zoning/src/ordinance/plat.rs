@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The plat: which packages this tree holds, and which `.zone` files govern them.
 //!
 //! A plat is the map of parcels in a tract, and that is what this module produces —

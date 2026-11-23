@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 if exists('b:did_ftplugin')
   finish
 endif

@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 " Who claims a `.zone` file.
 "
 " The extension is shared with BIND, so the plugin reads the first declaration instead of

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Which files are even eligible to be judged.
 //!
 //! Two answers, and the tool wants their intersection: what is on disk under the

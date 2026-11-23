@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 

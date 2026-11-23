@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """The import under test: real in the source, absent at runtime."""
 
 from __future__ import annotations

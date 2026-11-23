@@ -1,3 +1,4 @@
+; Copyright (c) 2026 The Billy Company
 (comment) @comment
 (string) @string
 (escape_sequence) @string.escape

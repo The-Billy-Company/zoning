@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Advisory cartography: what the contract *could* govern, and doesn't yet.
 //!
 //! A gate that only says no is a gate people route around. The census is the other

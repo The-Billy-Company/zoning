@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """A layer that re-exports its own helper — the ordinary Python package shape."""
 
 from __future__ import annotations

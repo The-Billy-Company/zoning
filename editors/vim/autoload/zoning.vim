@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 function! zoning#indent(lnum) abort
   let l:current = getline(a:lnum)
   let l:previous_number = prevnonblank(a:lnum - 1)

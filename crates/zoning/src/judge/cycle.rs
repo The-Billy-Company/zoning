@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Strongly-connected components, iteratively.
 //!
 //! Tarjan's algorithm, written with an explicit stack rather than recursion: the

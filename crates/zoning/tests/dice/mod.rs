@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! A seeded source of arbitrary packages, so a failure is a number you can replay.
 //!
 //! There is no `proptest` here for the same reason there are no dependencies anywhere

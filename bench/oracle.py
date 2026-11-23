@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """Cases where the right answer is known before any tool is asked.
 
 A speed table only compares tools that agree. These cases are where they don't,

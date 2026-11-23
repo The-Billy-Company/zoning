@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Two questions a person actually asks, answered before they write the import.
 //!
 //! A gate that only speaks when it is angry teaches nothing. `verify` says what broke;

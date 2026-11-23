@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 use std::collections::HashSet;
 use std::io::IsTerminal as _;
 use std::path::PathBuf;

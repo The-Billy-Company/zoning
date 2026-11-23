@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """The import under test: absolute, and pointing at its own package."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """The import under test: a real dependency that never appears as an import."""
 
 from __future__ import annotations

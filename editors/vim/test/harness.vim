@@ -1,3 +1,4 @@
+" Copyright (c) 2026 The Billy Company
 " A named-assertion harness for the Vim runtime, and the runtime the suites load.
 "
 " The suites used to signal with `cquit <n>`, which tells you a number and makes you count

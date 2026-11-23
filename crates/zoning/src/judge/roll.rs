@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The roll: which members of a workspace showed up, and what they left unused.
 //!
 //! Every other claim zoning makes is about one package, and the bench is built for

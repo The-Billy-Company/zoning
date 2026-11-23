@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """The facade: crosses into the core zone by an absolute import, and carries
 the one external dependency this package's contract grants it by name.
 """

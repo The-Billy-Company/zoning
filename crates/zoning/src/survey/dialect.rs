@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! What varies between languages, and nothing else.
 //!
 //! The interesting part of this tool — zones, seals, keeps, cycles, reach — is

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The seven checks themselves.
 //!
 //! Each reads the survey and writes findings onto the bench. They are separate

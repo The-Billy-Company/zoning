@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! A fake editor — the client half of the conversation, over either door the server opens.
 //!
 //! Two doors, one vocabulary. [`Editor::attached`] runs the server in this process over

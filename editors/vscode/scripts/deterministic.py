@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """Rewrite a VSIX with stable ordering, metadata, and timestamps."""
 
 from __future__ import annotations

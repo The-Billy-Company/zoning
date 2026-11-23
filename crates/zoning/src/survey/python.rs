@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Python — the second dialect, and the one whose imports are not paths.
 //!
 //! Every other property this tool needs falls out of one difference from Zig:

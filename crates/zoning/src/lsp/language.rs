@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 use std::collections::HashMap;
 
 use lsp_server::{Request, Response};

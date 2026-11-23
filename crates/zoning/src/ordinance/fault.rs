@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Where a complaint happened, and how it reads.
 //!
 //! Every fault carries the span of the word that caused it, not just the file.

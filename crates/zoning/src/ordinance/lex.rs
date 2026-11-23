@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Source text → tokens, each carrying the span it came from.
 //!
 //! The token set is deliberately tiny. A zone file is paths, prose, and a handful

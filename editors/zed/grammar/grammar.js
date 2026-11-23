@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 

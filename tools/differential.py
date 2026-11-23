@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 The Billy Company
 """Prove the Rust judge and the Python one reach the same verdict.
 
 A rewrite that only agrees on a clean tree has proven nothing — every gate agrees

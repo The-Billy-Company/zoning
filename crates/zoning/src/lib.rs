@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! **zoning** — declare where a package's imports may go, then judge the real graph.
 //!
 //! Most languages give you *some* boundary: Go has `internal/`, Python has a package

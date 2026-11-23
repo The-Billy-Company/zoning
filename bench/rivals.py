@@ -1,3 +1,4 @@
+# Copyright (c) 2026 The Billy Company
 """The tools this benchmark races, and how each one is asked the same question.
 
 Every gate here answers one thing — *does this package's import graph obey its

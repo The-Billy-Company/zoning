@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Language Server Protocol support for `.zone` authoring.
 
 mod diagnostics;

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 The Billy Company
 # Run every Vim suite in every Vim on this machine.
 #
 # Vim and Neovim are two implementations of the same runtime files, and they disagree often

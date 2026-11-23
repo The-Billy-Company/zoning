@@ -1,0 +1,12 @@
+{
+  "exclude": [
+    {
+      "path": "editors/zed/grammar/src/**",
+      "reason": "Tree-sitter generated parser and upstream runtime headers; regeneration owns these bytes."
+    },
+    {
+      "path": "tests/fixtures/pass/host/.zig-cache/**",
+      "reason": "Captured Zig cache fixture; generated dependency source is not project-authored code."
+    }
+  ]
+}

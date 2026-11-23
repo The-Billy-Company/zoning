@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! What the two audiences actually receive.
 //!
 //! A report is an interface: a person reads the human form at a terminal width they did

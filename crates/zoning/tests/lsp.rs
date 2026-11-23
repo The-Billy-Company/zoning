@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! Every capability the server advertises, exercised the way an editor exercises it.
 //!
 //! A language server's contract is its `initialize` response: each `…Provider` key is a

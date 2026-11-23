@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 import { mkdir, rm } from "node:fs/promises";
 
 await Promise.all(

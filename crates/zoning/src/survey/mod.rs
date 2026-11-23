@@ -1,3 +1,4 @@
+// Copyright (c) 2026 The Billy Company
 //! The survey: what the code actually does, before anyone judges it.
 //!
 //! A dialect says how an import is spelled; this module turns that into the one
