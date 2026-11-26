@@ -6,6 +6,32 @@ workspace's `Cargo.toml`.
 
 <!-- towncrier release notes start -->
 
+## [2.0.0] - 2026-11-26
+
+### Added
+
+- Rust packages can declare import boundaries in the same `.zone` language as Zig
+  and Python. Cargo targets, module paths, grouped imports, aliases and qualified
+  references feed the existing seven laws. The source graph covers conditional
+  branches conservatively; it does not claim to analyze generated macro output.
+  Unreadable or malformed source now fails the survey instead of producing a
+  clean verdict over an incomplete graph.
+
+### Changed
+
+- Library callers now create one `survey::Session` per invocation and provide it
+  through `Ask::session`. `Survey::of` returns `Result<Survey>` so unreadable or
+  unsupported source cannot produce a clean partial graph. Implementations of
+  `Dialect` now resolve located references through the batch `references` method.
+  These source API changes require a major version update; the seven contract
+  laws and CLI policy syntax are unchanged.
+
+### Fixed
+
+- We now trace Python 3.15's explicit lazy imports through the same dependency graph as eager
+  imports. Deferring a module no longer hides its import boundaries, dependency grants or cycles
+  from verification.
+
 ## [1.4.0] - 2026-08-17
 
 ### Added
