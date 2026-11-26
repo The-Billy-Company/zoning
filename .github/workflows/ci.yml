@@ -55,9 +55,9 @@ jobs:
           tool: cargo-deny@0.20.2
       - run: cargo deny check
 
-  # The tool judging itself. zoning's own tree is Rust, so there is no `.zone`
-  # contract to check here yet; what this proves is that the binary runs, parses
-  # a real contract, and exits the way a gate must.
+  # Real contracts exercise the built CLI and its exit statuses. Rust source,
+  # Cargo target ownership and compiler-backed rejection cases are exercised by
+  # the Rust integration suites in the check and portability jobs.
   dogfood:
     name: judge a real contract
     runs-on: ubuntu-latest

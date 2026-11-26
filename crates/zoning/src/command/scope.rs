@@ -2,7 +2,7 @@
 use std::path::{Path, PathBuf};
 
 use zoning::ordinance;
-use zoning::survey::{Ask, Dialect, Survey};
+use zoning::survey::{Dialect, Survey};
 
 use super::Tracked;
 
@@ -155,17 +155,10 @@ pub(super) fn probe(
     tracked: &mut Tracked<'_>,
     nested: &[String],
     package: &str,
-) -> Survey {
+) -> zoning::Result<Survey> {
     let exclude: Vec<zoning::pattern::Pattern> =
         nested.iter().map(|glob| zoning::pattern::Pattern::new(glob)).collect();
-    Survey::of(&Ask {
-        repo_root: dir,
-        module_root: &dir.join(source),
-        exclude: &exclude,
-        dialect,
-        package,
-        tracked: tracked.of(dialect),
-    })
+    tracked.survey(dir, &dir.join(source), &exclude, dialect, package)
 }
 
 /// Where a package's module lives, and globs for the packages nested inside it.
@@ -179,7 +172,10 @@ pub(super) fn probe(
 /// one's zone stack — so they are excluded, and the enclosing package keeps only the
 /// dependency it genuinely has: the module, declared with `use`.
 pub(super) fn module(dir: &Path) -> (&'static str, Vec<String>) {
-    let source = if dir.join("src").is_dir() { "src" } else { "." };
+    let source = spoken(dir).map_or_else(
+        || if dir.join("src").is_dir() { "src" } else { "." },
+        |dialect| dialect.source_root(dir),
+    );
     let inside = if source == "." { String::new() } else { format!("{source}/") };
     let nested = ordinance::parcels(dir, &[])
         .into_iter()

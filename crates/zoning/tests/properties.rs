@@ -34,6 +34,7 @@ fn zig() -> &'static dyn zoning::survey::Dialect {
 /// Survey a grown package under the contract it is governed by.
 fn survey_of(grown: &dice::Grown, ordinance: &Ordinance) -> Survey {
     Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &grown.root,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
@@ -41,6 +42,7 @@ fn survey_of(grown: &dice::Grown, ordinance: &Ordinance) -> Survey {
         package: &ordinance.package,
         tracked: None,
     })
+    .expect("the fixture source can be surveyed")
 }
 
 /// Directory-spanning import cycles, found by an oracle that shares no code with the law.
@@ -293,13 +295,15 @@ fn use_case(rolls: &mut Dice, grown: &dice::Grown) -> Option<String> {
         Err(fault) => return Some(format!("a use-oracle contract must parse:\n{fault}\n{text}")),
     };
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &grown.root,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
         package: &ordinance.package,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     let found = judge::judge(&survey, &ordinance);
 
     // The oracle: for every outside import the generator actually wrote, whether the

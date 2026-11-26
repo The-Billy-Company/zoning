@@ -27,12 +27,13 @@ use zoning::survey::{self, Ask, Dialect, Survey};
 struct Tracked<'a> {
     root: &'a Path,
     off: bool,
+    session: survey::Session,
     seen: HashMap<&'static str, Option<HashSet<PathBuf>>>,
 }
 
 impl<'a> Tracked<'a> {
     fn new(root: &'a Path, off: bool) -> Self {
-        Self { root, off, seen: HashMap::new() }
+        Self { root, off, session: survey::Session::default(), seen: HashMap::new() }
     }
 
     fn of(&mut self, dialect: &'static dyn Dialect) -> Option<&HashSet<PathBuf>> {
@@ -43,6 +44,27 @@ impl<'a> Tracked<'a> {
             .entry(dialect.name())
             .or_insert_with(|| survey::tracked(self.root, dialect.extensions()))
             .as_ref()
+    }
+    fn survey(
+        &mut self,
+        repo_root: &Path,
+        module_root: &Path,
+        exclude: &[zoning::pattern::Pattern],
+        dialect: &'static dyn Dialect,
+        package: &str,
+    ) -> Result<Survey> {
+        let _ = self.of(dialect);
+        let tracked =
+            if self.off { None } else { self.seen.get(dialect.name()).and_then(Option::as_ref) };
+        Survey::of(&Ask {
+            session: &self.session,
+            repo_root,
+            module_root,
+            exclude,
+            dialect,
+            package,
+            tracked,
+        })
     }
 }
 
@@ -158,14 +180,13 @@ fn judge_all(
             continue;
         }
 
-        let found = Survey::of(&Ask {
-            repo_root: root,
-            module_root: &contract.module_root,
-            exclude: &contract.exclude,
-            dialect: contract.dialect,
-            package: &contract.package,
-            tracked: tracked.of(contract.dialect),
-        });
+        let found = tracked.survey(
+            root,
+            &contract.module_root,
+            &contract.exclude,
+            contract.dialect,
+            &contract.package,
+        )?;
 
         if options.verb == Verb::Map {
             if options.json {
@@ -245,7 +266,7 @@ fn ungoverned(
         let dir = root.join(&parcel.dir);
         let (source, inside) = module(&dir);
         let name = declared(&dir, dialect).unwrap_or_default();
-        let found = probe(&dir, source, dialect, tracked, &inside, &name);
+        let found = probe(&dir, source, dialect, tracked, &inside, &name)?;
         // A manifest with no source behind it declares a package without being a module,
         // so there is nothing for a contract to say about it and nothing missing.
         if found.files.is_empty() {

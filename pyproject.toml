@@ -2,8 +2,10 @@
 #
 # zoning is a Rust program with no Python in it. This file exists because the
 # tool's job is to run in other people's CI, and the cheapest thing to ask a CI
-# runner for is `uvx zoning verify` - no Rust toolchain, no compile step, no
-# `cargo install` cache to warm. maturin's `bindings = "bin"` packages the
+# runner for is `uvx zoning verify`. Zig and Python need no Rust toolchain;
+# Rust surveys additionally need Cargo for offline target metadata. There is no
+# compile step or `cargo install` cache to warm when using the prebuilt wheel.
+# maturin's `bindings = "bin"` packages the
 # release binary as a wheel's console script, so the PyPI artifact and the
 # crates.io artifact are the same program built from the same source, and
 # neither is a reimplementation that can drift from the other.

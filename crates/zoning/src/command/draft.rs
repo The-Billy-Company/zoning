@@ -68,7 +68,7 @@ pub(super) fn draft(
         )
         .into());
     }
-    let found = probe(&dir, source, language, tracked, &nested, &name);
+    let found = probe(&dir, source, language, tracked, &nested, &name)?;
     if found.files.is_empty() {
         return Err(barren(&dir, source, language, &nested).into());
     }

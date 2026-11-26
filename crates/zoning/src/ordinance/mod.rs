@@ -329,11 +329,7 @@ fn resolve(
     let inherited_root = shared.and_then(|s| s.root.as_deref());
     let root = match pkg.root.as_ref().map(|t| t.text.as_str()).or(inherited_root) {
         Some(named) => named,
-        // `src/` where there is one, the package itself otherwise. Saying so is a line
-        // in every contract that has one and a required line in every contract that
-        // does not, and the answer is on disk either way.
-        None if base.join("src").is_dir() => "src",
-        None => ".",
+        None => dialect.source_root(&base),
     };
     let module_root = base.join(root);
     if !module_root.is_dir() {

@@ -362,7 +362,9 @@ fn semantic_tokens_paint_whole_words_and_read_a_law_as_a_type() {
     let data: Vec<u64> =
         tokens["data"].as_array().expect("token data").iter().filter_map(Value::as_u64).collect();
     let painted: Vec<(u64, u64, u64, u64)> = data
-        .chunks_exact(5)
+        .as_chunks::<5>()
+        .0
+        .iter()
         .scan((0, 0), |(line, start), token| {
             *line += token[0];
             *start = if token[0] == 0 { *start + token[1] } else { token[1] };
@@ -484,7 +486,7 @@ fn a_real_violation_reaches_the_source_file_that_caused_it() {
         .unwrap_or_else(|| panic!("`{uri}` breaks the keep law and must say so in its own buffer"));
     assert_eq!(violation["code"], "keep", "a diagnostic must name the law that fired");
     assert_eq!(violation["source"], "zoning");
-    assert_eq!(violation["range"]["start"]["line"], 0, "the import is on the first line");
+    assert_eq!(violation["range"]["start"]["line"], 1, "the import follows the copyright header");
     assert!(
         violation["message"].as_str().is_some_and(|message| message.contains("guest list")),
         "the buffer must carry the same remedy the command line prints: {violation}"

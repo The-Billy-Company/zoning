@@ -66,11 +66,11 @@
 //! | [`report`] | How does a person or a machine read the answer? |
 //!
 //! [`survey`] is where languages beyond Zig arrive: a [`survey::Dialect`] carries
-//! only what genuinely varies — extensions, how an import is spelled, whether a spec
-//! names something local, which modules the language hands out for free — while
-//! resolution, the graph, and all seven laws stay shared. Two dialects cannot
-//! disagree about what a cycle is. A contract names its own language, so one run
-//! judges a polyglot repository.
+//! language-owned source facts: package and target ownership, written references,
+//! their destinations and explicit reach. Graph construction and all seven laws
+//! stay shared. Rust uses Cargo metadata and a syntax tree; no adapter can exempt
+//! its edges from policy. A contract names its own language, so one run judges a
+//! polyglot repository.
 //!
 //! # As a library
 //!
@@ -82,16 +82,17 @@
 //! let contract = Ordinance::read(Path::new("acme.zone"), zig)?;
 //! let repo = Path::new(".");
 //! let found = Survey::of(&Ask {
+//!     session: &zoning::survey::Session::default(),
 //!     repo_root: repo,
 //!     module_root: &contract.module_root,
 //!     exclude: &contract.exclude,
 //!     dialect: contract.dialect,
 //!     package: &contract.package,
 //!     tracked: None,
-//! });
+//! })?;
 //! let verdict = judge::judge(&found, &contract);
 //! assert!(verdict.ok());
-//! # Ok::<(), zoning::ordinance::Fault>(())
+//! # Ok::<(), zoning::Error>(())
 //! ```
 
 mod error;

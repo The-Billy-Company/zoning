@@ -51,15 +51,26 @@ pub const SKIP: &[&str] = &[
 /// Every source file under `root`, as (absolute path, root-relative posix path).
 ///
 /// Sorted, so a verdict does not depend on directory-entry order.
-#[must_use]
-pub(super) fn source_files(root: &Path, extensions: &[&str]) -> Vec<(PathBuf, String)> {
+pub(super) fn source_files(
+    root: &Path,
+    extensions: &[&str],
+) -> crate::Result<Vec<(PathBuf, String)>> {
     let mut found = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
-        for entry in entries.flatten() {
+        let entries = std::fs::read_dir(&dir).map_err(|error| {
+            format!(
+                "{}: cannot read source directory: {error}; restore access before judging",
+                dir.display()
+            )
+        })?;
+        for entry in entries {
+            let entry = entry
+                .map_err(|error| format!("{}: cannot read source entry: {error}", dir.display()))?;
             let path = entry.path();
-            let Ok(kind) = entry.file_type() else { continue };
+            let kind = entry
+                .file_type()
+                .map_err(|error| format!("{}: cannot inspect source: {error}", path.display()))?;
             let name = entry.file_name();
             let name = name.to_string_lossy();
             if kind.is_dir() {
@@ -74,7 +85,7 @@ pub(super) fn source_files(root: &Path, extensions: &[&str]) -> Vec<(PathBuf, St
         }
     }
     found.sort_by(|a, b| a.1.cmp(&b.1));
-    found
+    Ok(found)
 }
 
 /// Every version-controlled source file in the worktree, or `None` if git cannot say.

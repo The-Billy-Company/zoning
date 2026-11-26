@@ -1,5 +1,4 @@
 // Copyright (c) 2026 The Billy Company
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use lsp_server::{Connection, Notification};
@@ -8,7 +7,7 @@ use serde_json::{Value, json};
 use super::language::{range, utf16_column};
 use crate::Result;
 use crate::judge;
-use crate::ordinance::{Fault, Ordinance};
+use crate::ordinance::{self, Fault, Ordinance};
 use crate::survey::{self, Ask, Survey};
 
 pub(super) fn publish(connection: &Connection, uri: &str, text: &str) -> Result<()> {
@@ -27,8 +26,17 @@ pub(super) fn clear(connection: &Connection, uri: &str) -> Result<()> {
 }
 
 fn architecture(path: &Path, text: &str) -> Vec<Value> {
-    let Some((contract, survey)) = owning_contract(path) else {
-        return Vec::new();
+    let (contract, survey) = match owning_contract(path) {
+        Ok(Some(owned)) => owned,
+        Ok(None) => return Vec::new(),
+        Err(error) => {
+            return vec![json!({
+                "range": range(0, 0, 0, 1),
+                "severity": 1,
+                "source": "zoning",
+                "message": error.to_string()
+            })];
+        }
     };
     let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     judge::judge(&survey, &contract)
@@ -53,37 +61,31 @@ fn architecture(path: &Path, text: &str) -> Vec<Value> {
         .collect()
 }
 
-fn owning_contract(path: &Path) -> Option<(Ordinance, Survey)> {
-    let dialect = survey::dialect("zig")?;
-    for ancestor in path.ancestors().skip(1) {
-        let directory = ancestor.join("contract");
-        let Ok(entries) = fs::read_dir(directory) else {
+fn owning_contract(path: &Path) -> Result<Option<(Ordinance, Survey)>> {
+    let dialect = survey::dialect("zig").ok_or("the zig dialect is missing")?;
+    let ceiling = crate::repo_root(path.parent().unwrap_or(path));
+    let bounded = ceiling.join(".git").exists();
+    for ancestor in
+        path.ancestors().skip(1).take_while(|ancestor| !bounded || ancestor.starts_with(&ceiling))
+    {
+        let Some(contract_path) = ordinance::governing(ancestor) else { continue };
+        let contract = Ordinance::read(&contract_path, dialect)?;
+        if !path.starts_with(&contract.module_root) {
             continue;
-        };
-        for entry in entries.flatten() {
-            let contract_path = entry.path();
-            if contract_path.extension().is_none_or(|extension| extension != "zone") {
-                continue;
-            }
-            let Ok(contract) = Ordinance::read(&contract_path, dialect) else {
-                continue;
-            };
-            if !path.starts_with(&contract.module_root) {
-                continue;
-            }
-            let repo_root = crate::repo_root(ancestor);
-            let survey = Survey::of(&Ask {
-                repo_root: &repo_root,
-                module_root: &contract.module_root,
-                exclude: &contract.exclude,
-                dialect: contract.dialect,
-                package: &contract.package,
-                tracked: None,
-            });
-            return Some((contract, survey));
         }
+        let repo_root = if bounded { ceiling.as_path() } else { ancestor };
+        let survey = Survey::of(&Ask {
+            session: &survey::Session::default(),
+            repo_root,
+            module_root: &contract.module_root,
+            exclude: &contract.exclude,
+            dialect: contract.dialect,
+            package: &contract.package,
+            tracked: None,
+        })?;
+        return Ok(Some((contract, survey)));
     }
-    None
+    Ok(None)
 }
 
 fn send(connection: &Connection, uri: &str, diagnostics: &[Value]) -> Result<()> {

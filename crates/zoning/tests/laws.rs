@@ -34,13 +34,15 @@ fn fixture(kind: &str, name: &str) -> (Ordinance, Survey) {
     let ordinance = Ordinance::read(&contract, zig())
         .unwrap_or_else(|fault| panic!("fixture {kind}/{name} does not parse:\n{fault}"));
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &box_dir,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
         package: &ordinance.package,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     assert!(
         !survey.files.is_empty(),
         "fixture {kind}/{name} surveyed no files — did the tree move?"
@@ -66,7 +68,7 @@ fn a_contract_that_uses_every_construct_and_is_obeyed_passes() {
     let found = verdict("pass", "layered");
     assert!(found.ok(), "expected clean, got {:?}", laws(&found));
     assert_eq!(found.ratified.len(), 1, "the one variance should have been spent");
-    assert!(found.stale.is_empty());
+    assert_eq!(found.stale, Vec::<String>::new());
 }
 
 #[test]
@@ -132,13 +134,15 @@ fn lazy_imports_retain_local_edges_and_need_external_grants() {
     let contract = zoning::ordinance::governing(&box_dir).expect("copied contract");
     let ordinance = Ordinance::read(&contract, zig()).expect("Python contract");
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &box_dir,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
         package: &ordinance.package,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     let found = judge::judge(&survey, &ordinance);
     let _ = std::fs::remove_dir_all(&box_dir);
 
@@ -253,13 +257,15 @@ fn drafted(kind: &str, name: &str) -> (PathBuf, Result<Ordinance, zoning::ordina
     let box_dir = cloned(kind, name);
     let module_root = box_dir.join("src");
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &box_dir,
         module_root: &module_root,
         exclude: &[],
         dialect: zig(),
         package: name,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     let text = zoning::draft::contract(&survey, name, "src", &[]);
     let contract = box_dir.join("contract").join(format!("{name}.zone"));
     std::fs::create_dir_all(contract.parent().expect("contract dir")).expect("contract dir");
@@ -273,13 +279,15 @@ fn a_draft_describes_the_graph_it_was_taken_from() {
     let (box_dir, read) = drafted("pass", "layered");
     let ordinance = read.unwrap_or_else(|fault| panic!("a draft must parse:\n{fault}"));
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &box_dir,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
         package: &ordinance.package,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     let found = judge::judge(&survey, &ordinance);
     assert!(
         found.ok(),
@@ -344,13 +352,15 @@ fn member(name: &str) -> (Ordinance, Verdict) {
     let ordinance = Ordinance::read(&contract, zig())
         .unwrap_or_else(|fault| panic!("member {name} does not resolve:\n{fault}"));
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &box_dir,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
         package: &ordinance.package,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     assert!(!survey.files.is_empty(), "member {name} surveyed no files — did the tree move?");
     let verdict = judge::judge(&survey, &ordinance);
     (ordinance, verdict)

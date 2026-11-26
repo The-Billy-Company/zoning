@@ -148,13 +148,15 @@ fn a_contract_that_survives_mangling_can_still_be_judged() {
             // Judged against the real tree, not the empty scratch one: a contract that
             // matches nothing exercises none of the laws.
             let survey = Survey::of(&Ask {
+                session: &zoning::survey::Session::default(),
                 repo_root: &layered,
                 module_root: &layered.join("src"),
                 exclude: &ordinance.exclude,
                 dialect: ordinance.dialect,
                 package: &ordinance.package,
                 tracked: None,
-            });
+            })
+            .expect("the fixture source can be surveyed");
             let _ = zoning::judge::judge(&survey, &ordinance);
             judged += 1;
         }
@@ -185,6 +187,7 @@ fn the_import_scanner_survives_source_that_is_not_source() {
     for index in 0..dice::cases(600) {
         let dir = scratch.join(format!("case-{index}"));
         std::fs::create_dir_all(dir.join("src")).expect("src dir");
+        let mut invalid_utf8 = false;
         for file in 0..rolls.between(1, 3) {
             let mut bytes = Vec::new();
             for _ in 0..rolls.between(1, 40) {
@@ -194,10 +197,12 @@ fn the_import_scanner_survives_source_that_is_not_source() {
                     bytes.push(u8::try_from(rolls.below(256)).unwrap_or(b'?'));
                 }
             }
+            invalid_utf8 |= std::str::from_utf8(&bytes).is_err();
             std::fs::write(dir.join(format!("src/f{file}.zig")), &bytes).expect("write source");
         }
         let module = dir.join("src");
-        let _ = Survey::of(&Ask {
+        let surveyed = Survey::of(&Ask {
+            session: &zoning::survey::Session::default(),
             repo_root: &dir,
             module_root: &module,
             exclude: &[],
@@ -205,6 +210,11 @@ fn the_import_scanner_survives_source_that_is_not_source() {
             package: "",
             tracked: None,
         });
+        assert_eq!(
+            surveyed.is_err(),
+            invalid_utf8,
+            "case {index}: only invalid UTF-8 is a source-read error"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
     let _ = std::fs::remove_dir_all(&scratch);

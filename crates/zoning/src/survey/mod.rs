@@ -1,20 +1,15 @@
 // Copyright (c) 2026 The Billy Company
 //! The survey: what the code actually does, before anyone judges it.
 //!
-//! A dialect says how an import is spelled; this module turns that into the one
-//! structure every law reads — a set of judged files and the resolved edges between
-//! them. Resolution is lexical, not filesystem: `../` in an import is a spelling,
-//! and collapsing it needs no syscall, because the walk already proved the tree.
-//!
-//! Two kinds of import never become edges. One whose target is outside the judged
-//! set — a coworker's untracked new file — is counted and dropped: it is not yet
-//! part of the committed architecture. One that resolves to nothing at all is also
-//! dropped, because the compiler owns compile-time resolution and a gate that races
-//! it on someone's half-finished edit is just noise.
+//! Each language turns its import spellings into located file references. Shared
+//! code admits sources, preserves spans and tracking, then builds the one graph all
+//! seven laws read. Walks, reads and parsing are fallible: an unreadable source
+//! cannot make a partial graph pass.
 
 mod dialect;
 mod prose;
 mod python;
+mod rust;
 mod walk;
 mod zig;
 
@@ -22,11 +17,22 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub use dialect::{Dialect, Import, all as dialects, by_name as dialect};
+pub use dialect::{
+    Context, Destination, Dialect, Import, Reference, Source, all as dialects, by_name as dialect,
+};
 pub use prose::Prose;
 pub use walk::{SKIP, tracked};
 
 use crate::pattern::Pattern;
+
+/// Invocation-owned inputs shared by package surveys in one run.
+///
+/// Start a new session after changing manifests or target files. CLI runs and LSP
+/// publications own separate sessions, so no process-global state can go stale.
+#[derive(Default)]
+pub struct Session {
+    pub(crate) cargo: std::cell::RefCell<rust::Cache>,
+}
 
 /// One resolved intra-module import.
 #[derive(Clone)]
@@ -85,6 +91,8 @@ impl Departure {
 
 /// What to survey.
 pub struct Ask<'a> {
+    /// The invocation that owns cached build-system inputs.
+    pub session: &'a Session,
     /// The enclosing worktree, for reporting paths a human can click.
     pub repo_root: &'a Path,
     /// The module root the relative paths hang off.
@@ -125,121 +133,106 @@ pub struct Survey {
 }
 
 impl Survey {
-    /// Resolve every import under the module root.
-    #[must_use]
-    pub fn of(ask: &Ask<'_>) -> Self {
-        let mut spent = HashSet::new();
-        let admitted: Vec<(PathBuf, String)> =
-            walk::source_files(ask.module_root, ask.dialect.extensions())
-                .into_iter()
-                // The file that declares a package is not part of the module it declares.
-                // It only ever collides with the judged set when the module root *is* the
-                // package root, and a build script's imports are the build graph's, not
-                // this module's — governing them would put the build's own dependencies
-                // in the stack it is describing.
-                .filter(|(_, rel)| !ask.dialect.manifests().contains(&rel.as_str()))
-                .filter(|(abs, rel)| {
-                    let held: Vec<&str> = ask
-                        .exclude
-                        .iter()
-                        .filter(|p| p.matches(rel))
-                        .map(Pattern::as_str)
-                        .collect();
-                    if held.is_empty() {
-                        ask.tracked.is_none_or(|t| t.contains(abs))
-                    } else {
-                        spent.extend(held.into_iter().map(str::to_owned));
-                        false
-                    }
-                })
-                .collect();
-        let judged: HashSet<&str> = admitted.iter().map(|(_, rel)| rel.as_str()).collect();
-
-        // Every top-level name this survey considers its own — the first path segment
-        // of a nested file, or the bare stem of one loose at the module root. Only a
-        // dialect whose import spelling is a module name rather than a path (Python)
-        // reads this; it is how such a dialect tells its own package from an external
-        // one that happens to share the same leading word.
-        let roots: Vec<&str> = {
-            let mut set: Vec<&str> = admitted
-                .iter()
-                .map(|(_, rel)| match rel.split_once('/') {
-                    Some((first, _)) => first,
-                    None => stem(rel, ask.dialect.extensions()),
-                })
-                .collect();
-            set.sort_unstable();
-            set.dedup();
-            set
+    /// Resolve every import, or report why the graph is incomplete.
+    ///
+    /// # Errors
+    /// Returns traversal, source-read or language-resolution errors instead of a
+    /// successful graph that omitted unreadable or unsupported source.
+    pub fn of(ask: &Ask<'_>) -> crate::Result<Self> {
+        let (sources, spent) = read_sources(ask)?;
+        let context = Context {
+            session: ask.session,
+            module_root: ask.module_root,
+            package: ask.package,
+            sources: &sources,
         };
-
-        let (mut edges, mut escapes, mut skipped) = (Vec::new(), Vec::new(), 0);
-        let mut outside = Vec::new();
-        for (abs, src) in &admitted {
-            let Ok(raw) = fs::read_to_string(abs) else { continue };
-            let code = ask.dialect.prose().code_only(&raw);
-            let lines = Lines::of(&raw);
-            for import in ask.dialect.imports(src, &roots, ask.package, &raw, &code) {
-                let line = lines.at(import.offset);
-                let col = column(&raw, import.offset);
-                let width = raw[import.offset..]
-                    .chars()
-                    .take_while(|character| !character.is_whitespace() && *character != '(')
-                    .count()
-                    .max(1);
-                if !ask.dialect.is_local(&import.spec) {
-                    outside.push(Departure {
-                        src: src.clone(),
-                        spec: import.spec,
+        let references = ask.dialect.references(&context)?;
+        let by_path: HashMap<&str, (&Source, Lines)> = sources
+            .iter()
+            .map(|source| (source.path.as_str(), (source, Lines::of(&source.text))))
+            .collect();
+        let (mut edges, mut escapes, mut outside, mut skipped) =
+            (Vec::new(), Vec::new(), Vec::new(), 0);
+        for reference in references {
+            let (source, lines) = by_path.get(reference.source.as_str()).ok_or_else(|| {
+                format!(
+                    "the {} reader named an unjudged source `{}`",
+                    ask.dialect.name(),
+                    reference.source
+                )
+            })?;
+            if !source.text.is_char_boundary(reference.offset) {
+                return Err(format!(
+                    "{}: invalid reference offset {} from the {} reader",
+                    reference.source,
+                    reference.offset,
+                    ask.dialect.name()
+                )
+                .into());
+            }
+            let line = lines.at(reference.offset);
+            let col = column(&source.text, reference.offset);
+            let width = source.text[reference.offset..]
+                .chars()
+                .take_while(|c| !c.is_whitespace() && *c != '(')
+                .count()
+                .max(1);
+            match reference.destination {
+                Destination::Local { path, hops } => {
+                    if path == reference.source {
+                        continue;
+                    }
+                    if !by_path.contains_key(path.as_str()) {
+                        skipped += 1;
+                        continue;
+                    }
+                    edges.push(Edge {
+                        src: reference.source,
+                        dst: path,
                         line,
                         col,
                         width,
+                        hops,
+                        spec: reference.spec,
                     });
-                    continue;
                 }
-                let Some(dst) = resolve(src, &import.spec) else {
-                    escapes.push(Departure {
-                        src: src.clone(),
-                        spec: import.spec,
-                        line,
-                        col,
-                        width,
-                    });
-                    continue;
-                };
-                if dst == *src {
-                    // A file cannot architecturally depend on itself; a dialect whose
-                    // module name and file name can coincide (Python's package importing
-                    // its own top-level name from within) would otherwise draw one.
-                    continue;
-                }
-                if !judged.contains(dst.as_str()) {
-                    skipped += 1;
-                    continue;
-                }
-                edges.push(Edge {
-                    hops: import.spec.matches("../").count() as u32,
-                    src: src.clone(),
-                    dst,
+                Destination::Outside(module) => outside.push(Departure {
+                    src: reference.source,
+                    spec: module,
                     line,
                     col,
                     width,
-                    spec: import.spec,
-                });
+                }),
+                Destination::Escape => escapes.push(Departure {
+                    src: reference.source,
+                    spec: reference.spec,
+                    line,
+                    col,
+                    width,
+                }),
             }
         }
-
-        Self {
+        edges.sort_by(|a, b| {
+            (&a.src, a.line, a.col, &a.dst, &a.spec).cmp(&(&b.src, b.line, b.col, &b.dst, &b.spec))
+        });
+        edges.dedup_by(|a, b| {
+            a.src == b.src
+                && a.dst == b.dst
+                && a.line == b.line
+                && a.col == b.col
+                && a.spec == b.spec
+        });
+        Ok(Self {
             repo_root: ask.repo_root.to_path_buf(),
             module_root: ask.module_root.to_path_buf(),
-            files: admitted.into_iter().map(|(_, rel)| rel).collect(),
+            files: sources.into_iter().map(|source| source.path).collect(),
             edges,
             escapes,
             outside,
             skipped,
             spent,
             dialect: ask.dialect,
-        }
+        })
     }
 
     /// This module's real file set, with one hypothetical import in place of its graph.
@@ -307,6 +300,75 @@ impl Survey {
             .find(|(source, edge_line, _, _)| source == &path && *edge_line == line)
             .map_or((1, 1), |(_, _, col, width)| (col, width))
     }
+}
+
+fn read_sources(ask: &Ask<'_>) -> crate::Result<(Vec<Source>, HashSet<String>)> {
+    let mut spent = HashSet::new();
+    let mut sources = Vec::new();
+    for (absolute, path) in walk::source_files(ask.module_root, ask.dialect.extensions())? {
+        if ask.dialect.manifests().contains(&path.as_str()) {
+            continue;
+        }
+        let held: Vec<&str> =
+            ask.exclude.iter().filter(|p| p.matches(&path)).map(Pattern::as_str).collect();
+        if !held.is_empty() {
+            spent.extend(held.into_iter().map(str::to_owned));
+            continue;
+        }
+        if ask.tracked.is_some_and(|tracked| !tracked.contains(&absolute)) {
+            continue;
+        }
+        let text = fs::read_to_string(&absolute).map_err(|error| {
+            format!(
+                "{}: cannot read source: {error}; restore readable UTF-8 source before judging",
+                absolute.display()
+            )
+        })?;
+        sources.push(Source { path, text });
+    }
+    Ok((sources, spent))
+}
+
+/// Adapt a path-spelling language to the shared reference contract.
+fn lexical(
+    context: &Context<'_>,
+    prose: &Prose,
+    imports: impl Fn(&str, &[&str], &str, &str, &[u8]) -> Vec<Import>,
+    is_local: impl Fn(&str) -> bool,
+    extensions: &[&str],
+) -> Vec<Reference> {
+    let mut roots: Vec<&str> = context
+        .sources
+        .iter()
+        .map(|source| {
+            source
+                .path
+                .split_once('/')
+                .map_or_else(|| stem(&source.path, extensions), |(first, _)| first)
+        })
+        .collect();
+    roots.sort_unstable();
+    roots.dedup();
+    let mut found = Vec::new();
+    for source in context.sources {
+        let code = prose.code_only(&source.text);
+        for import in imports(&source.path, &roots, context.package, &source.text, &code) {
+            let destination = if is_local(&import.spec) {
+                resolve(&source.path, &import.spec).map_or(Destination::Escape, |path| {
+                    Destination::Local { path, hops: import.spec.matches("../").count() as u32 }
+                })
+            } else {
+                Destination::Outside(import.spec.clone())
+            };
+            found.push(Reference {
+                source: source.path.clone(),
+                offset: import.offset,
+                spec: import.spec,
+                destination,
+            });
+        }
+    }
+    found
 }
 
 /// A root-level file's own name, minus whichever of `extensions` it carries.

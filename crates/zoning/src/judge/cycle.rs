@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn a_line_has_no_components() {
-        assert!(components(&graph(&[("a", "b"), ("b", "c")])).is_empty());
+        assert_eq!(components(&graph(&[("a", "b"), ("b", "c")])), Vec::<Vec<String>>::new());
     }
 
     #[test]
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn a_self_loop_is_not_a_component() {
-        assert!(components(&graph(&[("a", "a")])).is_empty());
+        assert_eq!(components(&graph(&[("a", "a")])), Vec::<Vec<String>>::new());
     }
 
     /// What [`tangles`] keeps, without needing a survey to say it.
@@ -193,9 +193,15 @@ mod tests {
 
     #[test]
     fn a_cycle_inside_one_directory_is_that_directory_s_own_business() {
-        assert!(spanning(&[("a/one.zig", "a/two.zig"), ("a/two.zig", "a/one.zig")]).is_empty());
+        assert_eq!(
+            spanning(&[("a/one.zig", "a/two.zig"), ("a/two.zig", "a/one.zig")]),
+            Vec::<Vec<String>>::new()
+        );
         // A door file named for the directory it fronts counts as part of it.
-        assert!(spanning(&[("a/b.zig", "a/b/c.zig"), ("a/b/c.zig", "a/b.zig")]).is_empty());
+        assert_eq!(
+            spanning(&[("a/b.zig", "a/b/c.zig"), ("a/b/c.zig", "a/b.zig")]),
+            Vec::<Vec<String>>::new()
+        );
     }
 
     #[test]
@@ -206,6 +212,6 @@ mod tests {
             adjacency.entry(&pair[0]).or_default().push(&pair[1]);
         }
         adjacency.entry(names.last().expect("non-empty").as_str()).or_default();
-        assert!(components(&adjacency).is_empty());
+        assert_eq!(components(&adjacency), Vec::<Vec<String>>::new());
     }
 }

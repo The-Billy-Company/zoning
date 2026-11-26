@@ -111,18 +111,17 @@ impl Dialect for Zig {
         &["std", "builtin", "root"]
     }
 
-    fn prose(&self) -> &Prose {
-        &PROSE
+    fn references(&self, context: &super::Context<'_>) -> crate::Result<Vec<super::Reference>> {
+        Ok(super::lexical(context, &PROSE, Self::imports, Self::is_local, self.extensions()))
     }
 
-    fn imports(
-        &self,
-        _path: &str,
-        _roots: &[&str],
-        _own: &str,
-        source: &str,
-        code: &[u8],
-    ) -> Vec<Import> {
+    fn escape_remedy(&self) -> &'static str {
+        "Zig cannot follow a path across a module boundary; declare the dependency as a named module in build.zig"
+    }
+}
+
+impl Zig {
+    fn imports(_path: &str, _roots: &[&str], _own: &str, source: &str, code: &[u8]) -> Vec<Import> {
         let raw = source.as_bytes();
         let mut out = Vec::new();
         let mut i = 0;
@@ -150,13 +149,8 @@ impl Dialect for Zig {
     // Case-sensitive on purpose: an import spec is a literal path, and `.ZIG` is a
     // different file from `.zig` on every filesystem that distinguishes them.
     #[allow(clippy::case_sensitive_file_extension_comparisons, reason = "import specs are literal")]
-    fn is_local(&self, spec: &str) -> bool {
+    fn is_local(spec: &str) -> bool {
         spec.ends_with(".zig")
-    }
-
-    fn escape_remedy(&self) -> &'static str {
-        "Zig cannot follow a path across a module boundary; declare the dependency \
-         as a named module in build.zig"
     }
 }
 
@@ -201,7 +195,7 @@ mod tests {
 
     fn specs(source: &str) -> Vec<String> {
         let code = PROSE.code_only(source);
-        Zig.imports("test.zig", &[], "", source, &code).into_iter().map(|i| i.spec).collect()
+        Zig::imports("test.zig", &[], "", source, &code).into_iter().map(|i| i.spec).collect()
     }
 
     #[test]
@@ -260,8 +254,8 @@ const e = @import(comptime_value);
 
     #[test]
     fn a_named_module_is_not_a_path() {
-        assert!(Zig.is_local("a/b.zig"));
-        assert!(!Zig.is_local("std"));
-        assert!(!Zig.is_local("acme"));
+        assert!(Zig::is_local("a/b.zig"));
+        assert!(!Zig::is_local("std"));
+        assert!(!Zig::is_local("acme"));
     }
 }

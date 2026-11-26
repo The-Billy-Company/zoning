@@ -1,9 +1,8 @@
 // Copyright (c) 2026 The Billy Company
 //! A seeded source of arbitrary packages, so a failure is a number you can replay.
 //!
-//! There is no `proptest` here for the same reason there are no dependencies anywhere
-//! else in this crate: a gate that runs in everyone's CI should be a static binary you
-//! can audit in an afternoon. What a property test actually needs is a generator, a
+//! The property generator stays std-only; source and protocol parsers live at their
+//! own boundaries. What these property tests need is a generator, a
 //! deterministic seed, and invariants worth asserting — none of which requires a
 //! framework. `ZONING_CASES` and `ZONING_SEED` turn the same code into a long soak when
 //! somebody wants one, and every failure prints the seed that produced it, which is the

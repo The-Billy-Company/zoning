@@ -223,8 +223,7 @@ impl Bench<'_> {
                 1,
                 format!(
                     "import cycle across {} director{plural} ({}) over {} files: {} -> … \
-                     — analysis is lazy, so this compiles; it still makes the directories \
-                     one indivisible unit",
+                     — these directories form one mutually dependent unit",
                     dirs.len(),
                     dirs.join(", "),
                     component.len(),

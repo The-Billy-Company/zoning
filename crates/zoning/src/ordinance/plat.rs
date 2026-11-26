@@ -257,6 +257,9 @@ fn indexed(repo_root: &Path) -> Option<Vec<String>> {
 fn sift<'a>(repo_root: &Path, paths: impl Iterator<Item = &'a str>) -> (Vec<PathBuf>, Vec<Parcel>) {
     let (mut contracts, mut parcels) = (Vec::new(), Vec::new());
     for rel in paths {
+        if !repo_root.join(rel).is_file() {
+            continue;
+        }
         let (dir, name) = rel.rsplit_once('/').unwrap_or((".", rel));
         if Path::new(name).extension().is_some_and(|e| e.eq_ignore_ascii_case("zone")) {
             let path = repo_root.join(rel);

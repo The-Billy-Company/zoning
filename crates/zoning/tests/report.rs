@@ -49,13 +49,15 @@ fn wide() -> (Ordinance, Survey) {
     let dialect = zoning::survey::dialect("zig").expect("zig ships in-tree");
     let ordinance = Ordinance::read(&contract, dialect).expect("the contract parses");
     let survey = Survey::of(&Ask {
+        session: &zoning::survey::Session::default(),
         repo_root: &root,
         module_root: &ordinance.module_root,
         exclude: &ordinance.exclude,
         dialect: ordinance.dialect,
         package: &ordinance.package,
         tracked: None,
-    });
+    })
+    .expect("the fixture source can be surveyed");
     assert_eq!(survey.files.len(), CALLERS + 1, "the tree did not survey whole");
     (ordinance, survey)
 }

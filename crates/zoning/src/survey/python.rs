@@ -117,18 +117,17 @@ impl Dialect for Python {
         STDLIB
     }
 
-    fn prose(&self) -> &Prose {
-        &PROSE
+    fn references(&self, context: &super::Context<'_>) -> crate::Result<Vec<super::Reference>> {
+        Ok(super::lexical(context, &PROSE, Self::imports, Self::is_local, self.extensions()))
     }
 
-    fn imports(
-        &self,
-        path: &str,
-        roots: &[&str],
-        own: &str,
-        _source: &str,
-        code: &[u8],
-    ) -> Vec<Import> {
+    fn escape_remedy(&self) -> &'static str {
+        "Python cannot follow a relative import past the top of its own package; name the dependency as an absolute import instead"
+    }
+}
+
+impl Python {
+    fn imports(path: &str, roots: &[&str], own: &str, _source: &str, code: &[u8]) -> Vec<Import> {
         // Hyphen and underscore are the same package to a human, but only one of
         // them can appear in an identifier — a manifest's `my-package` is always
         // spelled `import my_package` in code, never with the hyphen.
@@ -160,13 +159,8 @@ impl Dialect for Python {
     // `imports` — every other spec is the bare top-level name of a module the build
     // (or the standard library) resolves, never a path.
     #[allow(clippy::case_sensitive_file_extension_comparisons, reason = "import specs are literal")]
-    fn is_local(&self, spec: &str) -> bool {
+    fn is_local(spec: &str) -> bool {
         spec.ends_with(".py")
-    }
-
-    fn escape_remedy(&self) -> &'static str {
-        "Python cannot follow a relative import past the top of its own package; \
-         name the dependency as an absolute import instead"
     }
 }
 
@@ -579,7 +573,7 @@ mod tests {
 
     fn owned_specs(path: &str, roots: &[&str], own: &str, source: &str) -> Vec<String> {
         let code = PROSE.code_only(source);
-        Python.imports(path, roots, own, source, &code).into_iter().map(|i| i.spec).collect()
+        Python::imports(path, roots, own, source, &code).into_iter().map(|i| i.spec).collect()
     }
 
     #[test]
@@ -942,9 +936,9 @@ import sys; import re
 
     #[test]
     fn is_local_distinguishes_a_produced_path_from_a_module_name() {
-        assert!(Python.is_local("../pkg/a.py"));
-        assert!(!Python.is_local("numpy"));
-        assert!(!Python.is_local("os"));
+        assert!(Python::is_local("../pkg/a.py"));
+        assert!(!Python::is_local("numpy"));
+        assert!(!Python::is_local("os"));
     }
 
     #[test]

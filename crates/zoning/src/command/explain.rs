@@ -7,7 +7,7 @@ use zoning::Result;
 use zoning::ordinance::{self, Ordinance};
 use zoning::report;
 use zoning::spinner::Spinner;
-use zoning::survey::{Ask, Survey};
+use zoning::survey::Survey;
 
 use super::Tracked;
 use super::args::Options;
@@ -53,14 +53,13 @@ pub(super) fn explain(
         .into());
     };
 
-    let found = Survey::of(&Ask {
-        repo_root: root,
-        module_root: &contract.module_root,
-        exclude: &contract.exclude,
-        dialect: contract.dialect,
-        package: &contract.package,
-        tracked: tracked.of(contract.dialect),
-    });
+    let found = tracked.survey(
+        root,
+        &contract.module_root,
+        &contract.exclude,
+        contract.dialect,
+        &contract.package,
+    )?;
     let named: Vec<String> = wanted
         .iter()
         .map(|path| judged(path, &contract, &found, tracked))

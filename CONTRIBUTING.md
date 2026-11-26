@@ -122,12 +122,12 @@ paints nothing, which is exactly what a grammar rename leaves behind.
   `use`, and no eighth. A proposal for a new law has to argue the compiler
   structurally cannot enforce what it wants, the way each of the seven already
   does — not merely that it would be convenient to check.
-- **A dialect adds surface, never behavior.** Resolution, the graph, all seven
-  laws, and every rendering are shared across dialects; a `Dialect` may only
-  answer "which extensions, how an import is spelled, what the standard
-  library is called" — never resolve a path its own way. A dialect that could
-  disagree with the others about what a cycle is would make the tool's verdict
-  depend on which language you happened to be judging.
+- **A dialect establishes source facts, never policy.** Each adapter owns its
+  language's parser, target and module ownership, and written name resolution.
+  It emits located file references, outside modules and escapes with explicit
+  reach. Graph construction, all seven laws and every rendering remain shared;
+  adapters cannot exempt an edge from a law or redefine what a cycle means.
+  Read the [Rust source contract](docs/rust.md) before changing that boundary.
 - **A draft never guesses at a claim.** `zone draft` derives the stack, the
   grants, and the reach ceiling from what the graph already does — all true
   today — but refuses to guess at seals, keeps, or a cycle's reason, because

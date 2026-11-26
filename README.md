@@ -50,10 +50,10 @@ seal: Re-export what the caller needs from the seal's entry file, or widen that 
 Every failure closes with the remedy for its law. A gate whose output does not
 say what to do next is a gate somebody eventually silences.
 
-It reads the tree, not a build system; there is no project model to configure,
-no graph to rebuild, nothing to keep in step. The judge stays std-only. The
-installed executable also carries a narrow, MSRV-checked protocol stack for its
-in-process language server.
+It reads source without building it. Zig and Python need no toolchain; Rust
+uses Cargo metadata for targets and dependency names, then parses written source.
+The graph laws stay std-only. Structured source and protocol parsing belong to
+the Rust adapter and the in-process language server, outside those laws.
 
 ## Why Not a Code Review?
 
@@ -84,7 +84,8 @@ build the day it stops being true.
 
 The dividing line is whether your language already separates the parts you mean
 to keep apart, at the grain you actually want. Zig draws none; Python's is
-real but coarser than a zone stack, which is why both dialects exist here.
+real but coarser than a zone stack. Rust adds visibility and crate boundaries,
+but architectural layers within a crate still need an explicit contract.
 
 ## Support
 
@@ -537,15 +538,17 @@ the file is in violation or the import is not allowed.
 
 ## Wiring It Into CI
 
-One step, and no Rust toolchain in the job:
+For Zig and Python, the gate needs no Rust toolchain in the job:
 
 ```yaml
 - name: Import topology
-  run: uv run --no-project --with zoning==1.1.0 zone verify --complete
+  run: uv run --no-project --with zoning==2.0.0 zone verify --complete
 ```
 
-No build, no compile database, no network beyond fetching itself. Pin the
-version: a gate whose verdict can change without a commit is not a gate.
+Rust additionally requires Cargo for offline target metadata; it does not build
+the governed crates or run their build scripts. Use a zoning build containing the
+Rust adapter. Pin the gate version: a verdict that can change without a commit
+is not a gate.
 
 `--complete` adds the one claim no law can make: every package in scope has a
 contract. Without it a clean run says nothing whatsoever about the package
@@ -569,47 +572,44 @@ With a toolchain already in the job, the same binary comes from crates.io:
 
 ## Languages
 
-Zig first, because Zig is where the absence of any boundary is total. Nothing
-above is about Zig, though: zones, seals, keeps, cycles, and reach are
-statements about a graph of files, and a graph of files has the same shape in
-every language.
+Zig, Python and Rust share the same contract language, graph laws and reports.
+A contract selects its `language`; `--language` supplies the default only when a
+package has not selected one. Package discovery recognizes each language's own
+manifest, including `Cargo.toml`, so `verify --complete` can find an ungoverned
+Rust crate.
 
-So the language-specific surface is deliberately tiny, and a `Dialect` carries
-only what genuinely varies:
+Each adapter owns the source facts its language requires: package identity,
+source and target ownership, import syntax, standard-library names, and the
+meaning of a written path. It produces located file references, outside module
+names and escapes. The shared survey retains original spelling and explicit
+parent reach; the seven laws never need to know how a Rust module is resolved.
+Unreadable source and parser failures are errors, not successful partial graphs.
 
-- which extensions are source,
-- how an import is spelled,
-- whether a given spec names a path inside the module or a dependency outside
-  it,
-- the comment and string conventions, so imports are read from code alone rather
-  than from a line that mentions one,
-- which filenames declare a package, so `list` can find one nobody has governed,
-- what name a manifest gives the package it declares, so a contract is called
-  what the build already calls it,
-- which modules the language always provides, so no contract spends a `use` line
-  on the standard library,
-- and which directories a manifest calls an in-tree dependency, so coverage knows
-  whose package is whose.
+Python resolves dotted and relative module spellings against source files.
+Its standard-library grant is a fixed union of CPython's supported module names,
+so the interpreter installed on the machine cannot change a contract's verdict.
 
-Resolution, the graph, all seven laws, and every rendering are shared. That is on
-purpose: a dialect that could resolve paths its own way is a dialect that could
-disagree with the others about what a cycle is.
+Rust supports Cargo editions 2018, 2021 and 2024. Targets in edition 2015 or an
+unknown edition fail explicitly rather than using the wrong path rules.
+Rust reads Cargo's target and dependency metadata without building dependencies
+or running build scripts. A single invocation shares that metadata across the
+workspace's crates. Complete files are parsed with `syn`; module declarations,
+inline modules and `#[path]` establish ownership. Grouped imports, aliases,
+reexports, qualified references and paths written in macro arguments all feed
+the same graph. A `mod` declaration establishes a namespace rather than creating
+a dependency cycle with its children.
 
-A contract names its own `language`, so a polyglot monorepo is one run rather than
-one run per dialect. `--language` sets the default for a package that has not
-said.
+Rust contracts default to the package root (`.`), covering library, binary,
+integration-test, example, benchmark and build-script targets. An explicit
+`root src` narrows that scope. `use` grants name the crate identifier visible in
+source, including Cargo aliases. `crate::` is an anchor with zero parent hops;
+`super` spends logical module hops even inside inline modules.
 
-Python is the second dialect, and it earns its keep on the same absence: a
-package's `import`s reach any module on `sys.path`, and nothing about the
-language says which of *your* packages may reach which. `from a.b import c`
-and `import a.b.c` both resolve dotted names against real files — a module or
-a package's `__init__.py`, whichever exists — and a relative import's leading
-dots climb exactly as many directories as they count, independent of how deep
-`from` nests. The standard library grant is a fixed list read out of `sys`
-across supported versions, not a per-repo guess, so `zone verify` never asks a
-contract to `use` `json` or `pathlib`: those names are not the repository's to
-grant, in any Python version the interpreter has shipped for years and will
-keep shipping.
+This is written-source topology. Conditional branches are surveyed as a
+conservative union, not as one compiled configuration. Procedural-macro output,
+build-generated source and type-driven method resolution require compiler
+analysis and are outside that claim. The [Rust guide](docs/rust.md) describes
+exact behavior, limits, examples and the alternatives considered.
 
 ## Build and Test
 
