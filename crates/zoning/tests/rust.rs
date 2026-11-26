@@ -515,7 +515,10 @@ fn legacy_rust_edition_paths_fail_explicitly_instead_of_becoming_external_grants
     fixture.write("src/api.rs", "use leaf::Thing; pub fn read() { let _ = Thing; }\n");
     fixture.compile_with_edition("2015");
     let error = fixture.error();
-    assert!(error.contains("src/lib.rs") && error.contains("edition 2015"), "{error}");
+    assert!(
+        error.replace('\\', "/").contains("src/lib.rs") && error.contains("edition 2015"),
+        "{error}"
+    );
     assert!(
         error.contains("2018, 2021 or 2024") && error.contains("compiler-based analysis"),
         "{error}"
@@ -530,5 +533,8 @@ fn edition_validation_follows_the_governed_cargo_target_scope() {
     fixture.write("examples/legacy.rs", "fn main() {}\n");
     fixture.survey("src").expect("an out-of-scope example must not restrict the library survey");
     let error = fixture.error();
-    assert!(error.contains("examples/legacy.rs") && error.contains("edition 2015"), "{error}");
+    assert!(
+        error.replace('\\', "/").contains("examples/legacy.rs") && error.contains("edition 2015"),
+        "{error}"
+    );
 }

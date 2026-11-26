@@ -292,7 +292,10 @@ fn an_unknown_cargo_edition_cannot_be_judged_with_current_resolution_rules() {
     let output = fixture.run("success");
     assert_eq!(output.status.code(), Some(2));
     let error = String::from_utf8(output.stderr).expect("UTF-8 diagnostic");
-    assert!(error.contains("src/lib.rs") && error.contains("edition unknown"), "{error}");
+    assert!(
+        error.replace('\\', "/").contains("src/lib.rs") && error.contains("edition unknown"),
+        "{error}"
+    );
     assert!(
         error.contains("2018, 2021 or 2024") && error.contains("compiler-based analysis"),
         "{error}"
